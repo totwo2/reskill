@@ -152,37 +152,73 @@ python3 scripts/fetch_my_skills.py  # 从 ~/.skillhub/credentials.json 读token
 
 ---
 
-## gh skill 发布进阶（调研中）
+## GitHub Agent Skills 官方发布/更新结构规范（已固化）
 
-> GitHub Agent Skills 官方发布路径（2026-04 GitHub 支持）。
-> 本节为调研笔记，不是马上投产的脚本。
+> 来源：https://agentskills.io/specification.md + gh CLI v2.94.0 实测
+> 最后更新：2026-08-11
 
-### gh skill CLI 状态
-- gh CLI ≥ v2.90.0 可用，本机 2.94.0 (preview)
-- 子命令：`search` / `install` / `preview` / `list` / `update` / `publish`
-- 别名：`gh skills`
+### 发布要求（publish）
 
-### 发布完整流程（官网规范，调研后补全）
-1. **结构校验**：仓库路径遵守 `<owner>/<skill-name>`，根目录包含 `SKILL.md`（YAML frontmatter name+description + Markdown 正文）
-2. **可选文件夹**：`scripts/`、`references/`、`assets/`（保持一层深）
-3. **发布命令**：`gh skill publish <owner>/<repo>`（或带 `--dry-run` 先预览）
-4. **后索引动作**：gh 会在仓库添加 `agent-skills` topic tag + 仓库 description 附上 skill manifest
-5. **更新动作**：`gh skill update <owner>/<repo>` 重新拉索引（版本号在 SKILL.md frontmatter 改）
+| 要求 | 说明 | 验证方式 |
+|------|------|----------|
+| 仓库 public | 必须公开 | `gh repo view --json visibility` |
+| `agent-skills` topic | gh skill publish 自动添加 | `gh api repos/<owner>/<repo>/topics` |
+| SKILL.md frontmatter | name+description 必填，allowed-tools 必须是字符串 | `gh skill publish --dry-run` |
+| name 规则 | 1-64字符，仅小写字母数字连字符，首尾/连续连字符不允许，必须与目录名相同 | agentskills.io 规范 |
+| description 规则 | 1-1024字符，描述用途+触发场景 | agentskills.io 规范 |
+| Release 存在 | 每个版本必须有对应 tag + release | `gh release list` |
+| 版本标签 | semver 推荐（v1.2.0），--tag 指定 | `gh skill publish --tag v1.2.0` |
+| Skill 发现约定 | `skills/*/SKILL.md`、`skills/{scope}/*/SKILL.md`、`*/SKILL.md`、`plugins/{scope}/skills/*/SKILL.md` | gh skill install 实测 |
+| 自动清理 | publish 会剥离 install metadata（`metadata.github-*`） | `gh skill publish --fix` |
+
+### 更新要求（update）
+
+| 要求 | 说明 |
+|------|------|
+| 版本通过 git tag 管理 | 每次更新打新 tag |
+| 版本解析优先级 | 最新 tagged release > 默认分支 HEAD |
+| 已安装 skill 的 source tracking | frontmatter 注入 source repo 信息，用于 update 检测变化 |
+| 固定版本 | `gh skill install --pin v1.2.0` 或 `skill@v1.2.0` |
+| 更新命令 | `gh skill update --all` 或 `gh skill update <owner>/<repo>` |
+
+### gh skill publish 命令
+```bash
+# 预览验证（不发布）
+gh skill publish --dry-run
+
+# 指定 tag 发布（非交互）
+gh skill publish --tag v1.2.0
+
+# 自动修复可修复问题（剥离 install metadata）
+gh skill publish --fix
+```
+
+### gh skill update 命令
+```bash
+# 更新所有已安装 skill
+gh skill update --all
+
+# 更新指定 skill
+gh skill update <owner>/<repo>
+```
 
 ### 关键差异（vs skillhub publish）
 - gh skill 不强制扫描凭据，**依赖 GitHub Secret scanning + Code scanning + Dependabot**
 - gh skill publish 不打包（仓库即目录），`.gitignore` 有效
 - gh skill 索引会读 SKILL.md frontmatter，name/description 不合格会拒绝发布
+- skillhub publish 打包不看 .gitignore，发布前必须临时移走含 token 的文件
 
 ### 本 reskill 的 GitHub 发布检查清单
 - [ ] SKILL.md frontmatter name 1-64 字符（小写字母数字连字符，首尾/连续连字符不允许）
 - [ ] description 1-1024 字符，含触发关键词
+- [ ] name 与目录名相同
+- [ ] allowed-tools 是字符串（不是数组）
 - [ ] 仓库 description 已填
 - [ ] topic `agent-skills` 已加
 - [ ] LICENSE 文件存在（MIT）
+- [ ] 每个版本有对应 tag + release
 - [ ] 已跑 `gh skill publish --dry-run` 看到 ✅
-
-详细调研结果待续…
+- [ ] 已跑 `bash scripts/preflight_secret_scan.sh .` 且退出码 0（硬性前置）
 
 ---
 
