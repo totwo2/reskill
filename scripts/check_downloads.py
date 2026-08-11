@@ -17,6 +17,8 @@ SKILLS = [
     ("zhi-neng-py-jiao-ben-you-hua", "智能py脚本优化"),
     ("da-jia-dou-lai-hui-da", "大家都来回答"),
     ("quibbler", "唱唱反调·人群模拟器"),
+    ("tmeetpeople", "二创tmeet人员管理版"),
+    ("fangdai-haiyao-hai-duojiu", "房贷还要还多久"),
 ]
 
 
