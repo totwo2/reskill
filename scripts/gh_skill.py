@@ -45,6 +45,102 @@ PATTERNS = {
 }
 
 # ============================================================
+# 规范检查
+# ============================================================
+SPEC_URLS = [
+    "https://agentskills.io/specification.md",
+    "https://agentskills.io/llms.txt",
+]
+CLI_HELP_URLS = [
+    "gh skill --help",
+    "gh skill publish --help",
+]
+LOCAL_SPEC_FILE = os.path.join(RESkill_DIR, "references", "github-skills-spec.md")
+
+
+def cmd_check_spec(args):
+    """检查 GitHub Agent Skills 规范是否有更新"""
+    print("🔍 检查 GitHub Agent Skills 规范更新...\n")
+    
+    # 1. 检查规范文档
+    print("📄 检查规范文档... ")
+    for url in SPEC_URLS:
+        try:
+            r = subprocess.run(["curl", "-s", "-I", "--connect-timeout", "10", url],
+                             capture_output=True, text=True)
+            if r.returncode == 0:
+                last_mod = None
+                for line in r.stdout.split('\n'):
+                    if line.lower().startswith('last-modified:'):
+                        last_mod = line.split(':', 1)[1].strip()
+                        break
+                print(f"  ✅ {url}")
+                if last_mod:
+                    print(f"     最后修改: {last_mod}")
+            else:
+                print(f"  ⚠️  无法访问 {url}")
+        except Exception as e:
+            print(f"  ⚠️  {url}: {e}")
+    
+    # 2. 检查 CLI 版本
+    print("\n🛠️  检查 gh CLI 版本... ")
+    r = subprocess.run(["gh", "skill", "--version"], capture_output=True, text=True)
+    if r.returncode == 0:
+        print(f"  ✅ {r.stdout.strip()}")
+    else:
+        print(f"  ⚠️  gh skill 命令不可用: {r.stderr}")
+    
+    # 3. 检查本地固化规范版本
+    print("\n📋 检查本地固化规范... ")
+    if os.path.exists(LOCAL_SPEC_FILE):
+        content = open(LOCAL_SPEC_FILE).read()
+        m = re.search(r'最后检查[：:](\d{4}-\d{2}-\d{2})', content)
+        last_check = m.group(1) if m else "未知"
+        m = re.search(r'规范版本[：:]([\d\.]+)', content)
+        spec_ver = m.group(1) if m else "未知"
+        print(f"  ✅ 本地规范文件: {LOCAL_SPEC_FILE}")
+        print(f"     最后检查: {last_check}")
+        print(f"     规范版本: {spec_ver}")
+    else:
+        print(f"  ⚠️  本地规范文件不存在: {LOCAL_SPEC_FILE}")
+    
+    # 4. 检查 gh skill 帮助文档变化
+    print("\n📖 检查 CLI 命令变化... ")
+    for cmd in CLI_HELP_URLS:
+        try:
+            r = subprocess.run(cmd.split(), capture_output=True, text=True)
+            if r.returncode == 0:
+                lines = r.stdout.strip().split('\n')
+                print(f"  ✅ {cmd}")
+                print(f"     文档长度: {len(r.stdout)} 字符, {len(lines)} 行")
+            else:
+                print(f"  ⚠️  {cmd}: {r.stderr[:100]}")
+        except Exception as e:
+            print(f"  ⚠️  {cmd}: {e}")
+    
+    # 5. 检查已知 skill 仓库的变化
+    print("\n📦 检查已知 skill 仓库... ")
+    for repo in ["anthropics/skills", "totwo2/reskill"]:
+        try:
+            r = subprocess.run(["gh", "api", f"repos/{repo}", "--jq", '.pushed_at'],
+                             capture_output=True, text=True)
+            if r.returncode == 0 and r.stdout.strip():
+                print(f"  ✅ {repo}: 最近推送 {r.stdout.strip()[:10]}")
+            else:
+                print(f"  ⚠️  {repo}: 无法获取信息")
+        except Exception as e:
+            print(f"  ⚠️  {repo}: {e}")
+    
+    # 6. 检查规范变更
+    print("\n💡 规范变更建议:")
+    print("   - 访问 https://agentskills.io/specification.md 查看最新规范")
+    print("   - 关注 gh skill 命令的更新日志")
+    print("   - 定期检查知名 skill 仓库的变更")
+    print("   - 更新本地规范文件时修改 '最后检查' 日期")
+
+
+
+# ============================================================
 # 凭据扫描（闸门核心）
 # ============================================================
 def scan_dir(directory, scan_all=False):
