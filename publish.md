@@ -1,56 +1,6 @@
 # publish.md — Skill发布流程
 
-> Main读这个文件。把skill推到SkillHub社区源 / Gitee / GitHub。
-
----
-
-## 🎯 首选通道：SkillHub 社区源发布（v1.2.0 新增）
-
-**SkillHub 是本技能生态的主发布地**（api.skillhub.cn），无需 Git 仓库即可上线，自带下载量/安装量追踪（配合 `scripts/check_downloads.py`）。
-
-### 前置条件
-
-1. 本机已安装 skillhub CLI（`~/.skillhub/skills_store_cli.py`，wrapper 在 `~/.local/bin/skillhub`）。
-2. **已登录**：`skillhub login --key skh_xxx`（token 只存在于本机登录态，**绝不写入 skill 包内任何文件**）。
-3. 待发布 skill 的 `SKILL.md` frontmatter 必须含：`slug`（kebab-case 3-128）、`displayName`、`version`（SemVer）、`description`。
-4. **发布前凭据扫描（硬性）**：`bash scripts/preflight_secret_scan.sh . --all` → 退出码必须 0。
-
-### 发布命令
-
-```bash
-# 预检（本地校验 metadata + 打包，不发 HTTP）
-skillhub publish {skill目录} --dry-run
-
-# 正式发布
-skillhub publish {skill目录} --changelog "v1.0: 初始发布"
-```
-
-- `--version` 可覆盖 SKILL.md 中的 version。
-- `--token` 覆盖登录态 token（CI 用，**仍不进包**）。
-- 输出含新发布/更新的 slug + 版本即成功。
-
-### 版本更新
-
-```
-1. 修改 skill 文件
-2. 更新 SKILL.md frontmatter 里的 version
-3. skillhub publish {skill目录} --changelog "v1.1: {更新内容摘要}"
-```
-
-### ⚠️ 打包注意（token 保护）
-
-**skillhub publish 打包不遵守 `.gitignore`，会把目录里所有文件打进 zip。** 发布前必须确认：
-
-- ❌ 目录里没有 `settings/reskill_config.yaml`（真 token 配置）——只有 `reskill_config.example.yaml`（占位符）才安全
-- ❌ 没有 `download_history.yaml` / `feedback_report.md` 等本地运行产物
-- ❌ 没有 `.git/`、`_meta.json` 等本地状态文件
-- ✅ 有 `*.example.*` 脱敏模板 + 凭据扫描 exit 0，才能发
-
-**真 token 只走登录态（`skillhub login --key`）或 `--token` 参数，任何情况下不落进 skill 目录。**
-
----
-
-## Gitee / GitHub 发布（备选通道）
+> Main读这个文件。把skill推到Gitee/GitHub。
 
 ---
 
@@ -154,29 +104,15 @@ git push
 
 ## GitHub发布步骤
 
-### 方式一：gh skill publish（Agent Skills 标准发布）
-
-GitHub Agent Skills 规范支持通过 `gh skill publish` 直接发布技能包到 GitHub 仓库。
+### 1. 创建仓库
 
 ```bash
-# 预检（dry-run，不实际推送）
-gh skill publish --dry-run
-
-# 正式发布
-gh skill publish
+gh repo create {仓库名} --public --description "{描述}"
 ```
 
-- 自动创建/更新 GitHub 仓库，技能以标准目录结构存储。
-- 安装者可通过 `gh skill install {owner}/{repo} {skill-name}` 一键安装。
-- 发布前确保 SKILL.md frontmatter 符合 Agent Skills 规范（name 全小写连字符、description 有英文）。
-
-### 方式二：手动创建仓库 + 推代码
+### 2. 推代码
 
 ```bash
-# 1. 创建仓库
-gh repo create {仓库名} --public --description "{描述}"
-
-# 2. 推代码
 cd {skill目录}
 git init
 git add -A
@@ -184,13 +120,6 @@ git commit -m "v1.0: 初始发布"
 git remote add origin https://github.com/{用户名}/{仓库名}.git
 git push -u origin master
 ```
-
-### CN 网络加速（GitHub clone 超时处理）
-
-如果 `git clone https://github.com/...` 超时，替换域名为镜像：
-- `github.com` → `kkgithub.com`（首选）
-- `github.com` → `bgithub.xyz`（备选）
-- 或加代理前缀：`https://gh-proxy.com/https://github.com/...`
 
 ---
 
@@ -204,11 +133,65 @@ v2.0 — 大改（架构变化、新模块）
 
 ---
 
+## 发布后监控同步
+
+发布完成后调一下同步脚本，将新增skill自动加入监控清单：
+
+```bash
+python3 scripts/fetch_my_skills.py  # 从 ~/.skillhub/credentials.json 读token
+```
+
+该脚本会：
+- 从 SkillHub 官方 API `/api/v1/users/<handle>/skills` 拉取本账号名下全部 skill
+- 与 `reskill_config.yaml` 的 `skillhub.skills` 段对比
+  - **云端新增** → 自动追加到配置
+  - **云端缺失** → 告警（可能下架）
+  - **display_name 不一致** → 同步成云端名称
+- 写云端快照到 `settings/my_skills_snapshot.yaml` 供审计
+- 退出码 0（无变化） / 2（有新增待写入配置）
+
+---
+
+## gh skill 发布进阶（调研中）
+
+> GitHub Agent Skills 官方发布路径（2026-04 GitHub 支持）。
+> 本节为调研笔记，不是马上投产的脚本。
+
+### gh skill CLI 状态
+- gh CLI ≥ v2.90.0 可用，本机 2.94.0 (preview)
+- 子命令：`search` / `install` / `preview` / `list` / `update` / `publish`
+- 别名：`gh skills`
+
+### 发布完整流程（官网规范，调研后补全）
+1. **结构校验**：仓库路径遵守 `<owner>/<skill-name>`，根目录包含 `SKILL.md`（YAML frontmatter name+description + Markdown 正文）
+2. **可选文件夹**：`scripts/`、`references/`、`assets/`（保持一层深）
+3. **发布命令**：`gh skill publish <owner>/<repo>`（或带 `--dry-run` 先预览）
+4. **后索引动作**：gh 会在仓库添加 `agent-skills` topic tag + 仓库 description 附上 skill manifest
+5. **更新动作**：`gh skill update <owner>/<repo>` 重新拉索引（版本号在 SKILL.md frontmatter 改）
+
+### 关键差异（vs skillhub publish）
+- gh skill 不强制扫描凭据，**依赖 GitHub Secret scanning + Code scanning + Dependabot**
+- gh skill publish 不打包（仓库即目录），`.gitignore` 有效
+- gh skill 索引会读 SKILL.md frontmatter，name/description 不合格会拒绝发布
+
+### 本 reskill 的 GitHub 发布检查清单
+- [ ] SKILL.md frontmatter name 1-64 字符（小写字母数字连字符，首尾/连续连字符不允许）
+- [ ] description 1-1024 字符，含触发关键词
+- [ ] 仓库 description 已填
+- [ ] topic `agent-skills` 已加
+- [ ] LICENSE 文件存在（MIT）
+- [ ] 已跑 `gh skill publish --dry-run` 看到 ✅
+
+详细调研结果待续…
+
+---
+
 ## 发布检查清单
 
 - [ ] **已跑 `bash scripts/preflight_secret_scan.sh .` 且退出码 0**（硬性前置）
-- [ ] SKILL.md 有name和description
+- [ ] SKILL.md 有 name 和 description
 - [ ] 所有模块文件存在
 - [ ] README.md 写清楚使用方法
 - [ ] 没有敏感信息（token、密码、个人路径）
 - [ ] 版本号已更新
+- [ ] **发布后已跑 `python3 scripts/fetch_my_skills.py`**（自动同步监控清单）
