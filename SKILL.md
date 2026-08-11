@@ -9,6 +9,14 @@ description: |
   提醒作者决策，自动优化skill。支持下载量趋势追踪（有新下载自动提醒）、
   发布前凭据扫描、多渠道消息通知（微信/飞书/钉钉/Telegram）。
   触发词：发布skill、检查反馈、用户意见、优化skill、更新skill、配置通知、下载量、下载趋势、同步skill列表、查名下skill
+license: MIT
+tags:
+  - publish
+  - feedback
+  - optimization
+  - skillhub
+  - github
+allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 ---
 
 # reskill — Skill发布与反馈优化系统
