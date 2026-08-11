@@ -1,14 +1,14 @@
 ---
 name: reskill
 slug: reskill
-version: 1.2.1
+version: 1.2.0
 displayName: Skill发布与反馈优化系统
 description: |
-  Skill publishing, user feedback collection, and continuous optimization system. Publish skills to SkillHub/Gitee/GitHub,
-  periodically check user issues, extract actionable feedback, notify the author, and auto-optimize skills.
-  Includes download trend tracking (auto-alert on new downloads) and multi-channel notifications (WeChat/Feishu/DingTalk/Telegram).
-  Triggers: publish skill, check feedback, user issues, optimize skill, update skill, configure notification, download trends, publish to skillhub.
-  Skill发布与反馈优化系统：发布skill到SkillHub/Gitee/GitHub，定期检查用户意见，提取有效反馈，提醒作者决策，自动优化skill。支持下载量趋势追踪与多渠道消息通知。
+  Skill发布、用户反馈收集与持续优化系统。发布skill到Gitee/GitHub/SkillHub，
+  自动同步名下已发布skill列表，定期检查用户意见，提取有效反馈，
+  提醒作者决策，自动优化skill。支持下载量趋势追踪（有新下载自动提醒）、
+  发布前凭据扫描、多渠道消息通知（微信/飞书/钉钉/Telegram）。
+  触发词：发布skill、检查反馈、用户意见、优化skill、更新skill、配置通知、下载量、下载趋势、同步skill列表、查名下skill
 ---
 
 # reskill — Skill发布与反馈优化系统
@@ -21,10 +21,10 @@ description: |
 
 | 用户说 | 动作 |
 |--------|------|
-| "发布skill" / "推到skillhub" / "发布到skillhub" | publish.md → SkillHub社区源发布 |
-| "发布skill" / "推到gitee" / "推到github" | publish.md → Gitee/GitHub发布流程 |
+| "发布skill" / "推到gitee" / "推到github" / "推到skillhub" | publish.md → 发布流程 |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查issues+SkillHub数据 |
 | "下载量" / "下载趋势" / "有没有新下载" | scripts/check_downloads.py → 对比快照+增量提醒 |
+| "同步skill列表" / "查名下skill" / "我在skillhub发了啥" | scripts/fetch_my_skills.py → 拉取名下skill+对比本地 |
 | "优化skill" / "根据反馈改" | feedback-collector.md → 提取+修复 |
 | "更新skill" / "发新版本" | publish.md → 版本更新+发布 |
 | "配置通知" / "飞书通知我" / "钉钉通知我" | notification.md → 配置通知渠道 |
@@ -43,6 +43,7 @@ description: |
 |----|----------|-----|
 | Gitee/GitHub Issues | 用户反馈、bug报告 | 平台API |
 | SkillHub | downloads/installs/stars变化 | https://api.skillhub.cn/api/v1/search?q={slug} |
+| SkillHub (名下) | 本账号发布的所有skill | https://api.skillhub.cn/api/v1/users/{handle}/skills |
 
 ---
 
@@ -50,9 +51,12 @@ description: |
 
 | 模块 | 文件 | 用途 |
 |------|------|------|
-| 发布 | publish.md | 推送到SkillHub社区源/Gitee/GitHub，版本管理 |
+| 发布 | publish.md | 推送到Gitee/GitHub，版本管理 |
 | 反馈 | feedback-collector.md | 检查issues，提取有效反馈，提醒作者 |
 | 通知 | notification.md | 多渠道消息通知（微信/飞书/钉钉/Telegram） |
+| 下载量追踪 | scripts/check_downloads.py | SkillHub下载量趋势快照+增量提醒 |
+| 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
+| 发布前扫描 | scripts/preflight_secret_scan.sh | 发布前扫描凭据防泄露 |
 
 ---
 
@@ -105,16 +109,6 @@ repo:
     - name: reskill
       skillhub_id: "87149"
   token: xxx
-
-github:
-  platform: github
-  owner: totwo2
-  repos:
-    - name: reskill
-    - name: zhi-py-opt
-    - name: quibbler
-    - name: da-jia-answer
-  token: xxx  # GitHub PAT (scopes: repo)
 
 skillhub:
   api_base: "https://api.skillhub.cn"
