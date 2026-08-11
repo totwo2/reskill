@@ -106,6 +106,16 @@ repo:
       skillhub_id: "87149"
   token: xxx
 
+github:
+  platform: github
+  owner: totwo2
+  repos:
+    - name: reskill
+    - name: zhi-py-opt
+    - name: quibbler
+    - name: da-jia-answer
+  token: xxx  # GitHub PAT (scopes: repo)
+
 skillhub:
   api_base: "https://api.skillhub.cn"
   skills:

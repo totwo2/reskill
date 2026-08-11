@@ -12,6 +12,16 @@ repo:
       skillhub_id: "148585"
   token: "YOUR_GITEE_TOKEN_HERE"
 
+github:
+  platform: github
+  owner: totwo2
+  repos:
+    - name: reskill
+    - name: zhi-py-opt
+    - name: quibbler
+    - name: da-jia-answer
+  token: "YOUR_GITHUB_TOKEN_HERE"
+
 skillhub:
   api_base: "https://api.skillhub.cn"
   skills:
