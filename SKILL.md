@@ -1,14 +1,15 @@
 ---
 name: reskill
 slug: reskill
-version: 1.2.0
+version: 1.3.0
 displayName: Skill发布与反馈优化系统
 description: |
   Skill发布、用户反馈收集与持续优化系统。发布skill到Gitee/GitHub/SkillHub，
   自动同步名下已发布skill列表，定期检查用户意见，提取有效反馈，
   提醒作者决策，自动优化skill。支持下载量趋势追踪（有新下载自动提醒）、
   发布前凭据扫描、多渠道消息通知（微信/飞书/钉钉/Telegram）。
-  触发词：发布skill、检查反馈、用户意见、优化skill、更新skill、配置通知、下载量、下载趋势、同步skill列表、查名下skill
+  GitHub Skill 完整生命周期管理（增删改查 + 闸门凭据扫描）。
+  触发词：发布skill、检查反馈、用户意见、优化skill、更新skill、配置通知、下载量、下载趋势、同步skill列表、查名下skill、GitHub skill、gh skill
 ---
 
 # reskill — Skill发布与反馈优化系统
@@ -25,9 +26,16 @@ description: |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查issues+SkillHub数据 |
 | "下载量" / "下载趋势" / "有没有新下载" | scripts/check_downloads.py → 对比快照+增量提醒 |
 | "同步skill列表" / "查名下skill" / "我在skillhub发了啥" | scripts/fetch_my_skills.py → 拉取名下skill+对比本地 |
+| "GitHub skill 发布" / "gh skill publish" | scripts/gh_skill.py publish → 闸门扫描+发布 |
+| "GitHub skill 创建" / "gh skill create" | scripts/gh_skill.py create → 闸门扫描+创建 |
+| "GitHub skill 搜索" / "gh skill search" | scripts/gh_skill.py search → 搜索 |
+| "GitHub skill 列表" / "gh skill list" | scripts/gh_skill.py list → 列出仓库 |
+| "GitHub skill 更新" / "gh skill update" | scripts/gh_skill.py update → 闸门扫描+更新 |
+| "GitHub skill 删除" / "gh skill delete" | scripts/gh_skill.py delete → 删除 release |
 | "优化skill" / "根据反馈改" | feedback-collector.md → 提取+修复 |
 | "更新skill" / "发新版本" | publish.md → 版本更新+发布 |
 | "配置通知" / "飞书通知我" / "钉钉通知我" | notification.md → 配置通知渠道 |
+| "凭据扫描" / "安全扫描" / "查token" | scripts/gh_skill.py scan → 闸门扫描 |
 
 ---
 
@@ -56,7 +64,8 @@ description: |
 | 通知 | notification.md | 多渠道消息通知（微信/飞书/钉钉/Telegram） |
 | 下载量追踪 | scripts/check_downloads.py | SkillHub下载量趋势快照+增量提醒 |
 | 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
-| 发布前扫描 | scripts/preflight_secret_scan.sh | 发布前扫描凭据防泄露 |
+| GitHub Skill生命周期 | scripts/gh_skill.py | 完整生命周期：create/publish/list/search/update/delete + 闸门凭据扫描 |
+| 发布前扫描 | scripts/preflight_secret_scan.sh | 发布前扫描凭据防泄露（legacy，被 gh_skill.py scan 替代） |
 
 ---
 
