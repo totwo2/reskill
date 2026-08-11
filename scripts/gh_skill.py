@@ -84,11 +84,12 @@ def cmd_check_spec(args):
     
     # 2. 检查 CLI 版本
     print("\n🛠️  检查 gh CLI 版本... ")
-    r = subprocess.run(["gh", "skill", "--version"], capture_output=True, text=True)
+    r = subprocess.run(["gh", "--version"], capture_output=True, text=True)
     if r.returncode == 0:
-        print(f"  ✅ {r.stdout.strip()}")
+        ver = r.stdout.strip().split('\n')[0]
+        print(f"  ✅ {ver}")
     else:
-        print(f"  ⚠️  gh skill 命令不可用: {r.stderr}")
+        print(f"  ⚠️  gh CLI 不可用: {r.stderr}")
     
     # 3. 检查本地固化规范版本
     print("\n📋 检查本地固化规范... ")
@@ -96,7 +97,7 @@ def cmd_check_spec(args):
         content = open(LOCAL_SPEC_FILE).read()
         m = re.search(r'最后检查[：:](\d{4}-\d{2}-\d{2})', content)
         last_check = m.group(1) if m else "未知"
-        m = re.search(r'规范版本[：:]([\d\.]+)', content)
+        m = re.search(r'规范版本[：:]\s*(v?[\d\.]+)', content)
         spec_ver = m.group(1) if m else "未知"
         print(f"  ✅ 本地规范文件: {LOCAL_SPEC_FILE}")
         print(f"     最后检查: {last_check}")
@@ -505,6 +506,10 @@ def main():
     p_upd.add_argument("--tag", required=True, help="新版本 tag")
     p_upd.add_argument("--dry-run", action="store_true")
 
+    # check-spec
+    p_spec = sub.add_parser("check-spec", help="检查 GitHub Agent Skills 规范是否有更新")
+    p_spec.add_argument("--verbose", action="store_true", help="显示详细信息")
+
     # delete
     p_del = sub.add_parser("delete", help="删除 release")
     p_del.add_argument("repo", help="owner/name")
@@ -521,6 +526,7 @@ def main():
         "update": cmd_update,
         "delete": cmd_delete,
         "scan": cmd_scan,
+        "check-spec": cmd_check_spec,
     }
     cmds[args.command](args)
 
