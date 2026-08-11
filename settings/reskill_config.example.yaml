@@ -29,6 +29,8 @@ skillhub:
       display_name: "全流程网络小说写作系统"
     - slug: reskill
       display_name: "Skill发布与反馈优化系统"
+    - slug: zhi-neng-py-jiao-ben-you-hua
+      display_name: "智能py脚本优化"
     - slug: da-jia-dou-lai-hui-da
       display_name: "大家都来回答"
     - slug: quibbler
