@@ -14,6 +14,7 @@ HISTORY = os.path.join(SETTINGS, "download_history.yaml")
 SKILLS = [
     ("everytime-novel", "全流程网络小说写作系统"),
     ("reskill", "Skill发布与反馈优化系统"),
+    ("zhi-neng-py-jiao-ben-you-hua", "智能py脚本优化"),
     ("da-jia-dou-lai-hui-da", "大家都来回答"),
     ("quibbler", "唱唱反调·人群模拟器"),
 ]
