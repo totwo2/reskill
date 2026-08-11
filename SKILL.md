@@ -25,270 +25,239 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 
 ---
 
-## 启动路由
+## 1. 触发词（命中即启动）
 
-| 用户说 | 动作 |
-|--------|------|
-| "发布skill" / "推到gitee" / "推到github" / "推到skillhub" | publish.md → 发布流程 |
-| "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查issues+SkillHub数据 |
-| "下载量" / "下载趋势" / "有没有新下载" | scripts/check_downloads.py → 对比快照+增量提醒 |
-| "同步skill列表" / "查名下skill" / "我在skillhub发了啥" | scripts/fetch_my_skills.py → 拉取名下skill+对比本地 |
-| "优化skill" / "根据反馈改" | feedback-collector.md → 提取+修复 |
-| "更新skill" / "发新版本" | publish.md → 版本更新+发布 |
-| "配置通知" / "飞书通知我" / "钉钉通知我" | notification.md → 配置通知渠道 |
+| 用户说法 | 意图 | 入口文件 |
+|---------|------|---------|
+| "发布skill" / "推到gitee" / "推到github" / "推到skillhub" | 发布新skill | publish.md |
+| "检查反馈" / "有没有issue" / "用户意见" / "查下反馈" | 检查issues+SkillHub数据 | feedback-collector.md |
+| "下载量" / "下载趋势" / "有没有新下载" | 下载量趋势追踪 | scripts/check_downloads.py |
+| "同步skill列表" / "查名下skill" / "我在skillhub发了啥" | 拉取名下skill列表 | scripts/fetch_my_skills.py |
+| "优化skill" / "根据反馈改" / "改一下这个skill" | 提取反馈+修复 | feedback-collector.md |
+| "更新skill" / "发新版本" / "升级skill" | 版本更新+发布 | publish.md |
+| "配置通知" / "飞书通知我" / "钉钉通知我" / "微信通知" | 配置通知渠道 | notification.md |
 
----
-
-## 架构
-
-```
-发布 → 用户使用 → 提issue/安装 → 收集反馈 → 提醒作者 → 作者决策 → 修复+测试 → 发布新版本
-```
-
-## 数据源
-
-| 源 | 检查内容 | API |
-|----|----------|-----|
-| Gitee/GitHub Issues | 用户反馈、bug报告 | 平台API |
-| SkillHub | downloads/installs/stars变化 | https://api.skillhub.cn/api/v1/search?q={slug} |
-| SkillHub (名下) | 本账号发布的所有skill | https://api.skillhub.cn/api/v1/users/{handle}/skills |
+**注意**：触发词不限于上述 exact match，用户表达类似意图也应启动。
 
 ---
 
-## 模块索引
+## 2. 执行前必读
 
-| 模块 | 文件 | 用途 |
-|------|------|------|
-| 发布 | publish.md | 推送到Gitee/GitHub，版本管理 |
-| 反馈 | feedback-collector.md | 检查issues，提取有效反馈，提醒作者 |
-| 通知 | notification.md | 多渠道消息通知（微信/飞书/钉钉/Telegram） |
-| 下载量追踪 | scripts/check_downloads.py | SkillHub下载量趋势快照+增量提醒 |
-| 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
-| 发布前扫描 | scripts/preflight_secret_scan.sh | 发布前扫描凭据防泄露 |
+### 2.1 前置检查清单
+
+启动任何操作前，先确认：
+- [ ] 用户已提供必要信息（仓库地址、token、通知渠道等）
+- [ ] `settings/reskill_config.yaml` 存在且配置正确（如果已有配置）
+- [ ] 网络可达（GitHub/Gitee/SkillHub API）
+
+### 2.2 配置文件位置
+
+```
+settings/
+├── reskill_config.example.yaml   # 配置模板
+├── reskill_config.yaml           # 用户实际配置（可能不存在）
+├── notify_config.yaml            # 通知渠道配置
+└── release_history/
+    └── reskill.yaml              # 发布历史记录
+```
+
+如果 `reskill_config.yaml` 不存在，先引导用户配置，或从 `reskill_config.example.yaml` 复制后填写。
 
 ---
 
-## 用户需要提供
+## 3. 各模块操作手册
 
-| 信息 | 说明 | 示例 |
-|------|------|------|
-| 仓库地址 | 要监控的Gitee/GitHub仓库 | gitee.com/gaoooyc/reskill |
-| Token | 平台API访问权限 | Gitee私人令牌 / GitHub PAT |
-| 通知渠道 | 接收通知的方式 | 微信（默认）/飞书webhook/钉钉webhook |
+### 3.1 发布 skill（publish.md）
 
-### 配置示例
+**触发**：用户说"发布skill"、"推到github"等
 
-用户告诉AI：
-```
-“监控 gitee.com/gaoooyc/reskill 的issues”
-→ AI记录仓库地址
-→ AI用已有token检查issues
-→ 用当前会话渠道通知
-```
+**前置**：
+1. 确认 skill 目录结构完整（SKILL.md + scripts/ + README.md + LICENSE）
+2. 确认 frontmatter 合法（name/description/tags/allowed-tools/license）
+3. 跑凭据扫描：`bash scripts/preflight_secret_scan.sh .`
+4. 确认退出码为 0
 
-如果用户要换通知渠道：
-```
-“用飞书通知我”
-→ AI问webhook地址
-→ 写入notify_config.yaml
-```
-
----
-
-## 快速开始
-
-### 第一步：用户提供配置
-
-用户需要告诉AI：
-```
-“监控这个仓库：gitee.com/xxx/xxx”
-“Token是：xxx”
-“用微信通知我”
-```
-
-AI写入 `settings/reskill_config.yaml`：
-```yaml
-repo:
-  platform: gitee  # gitee / github
-  owner: xxx
-  repos:
-    - name: everytime-novel
-      skillhub_id: "87148"
-    - name: reskill
-      skillhub_id: "87149"
-  token: xxx
-
-skillhub:
-  api_base: "https://api.skillhub.cn"
-  skills:
-    - slug: everytime-novel
-    - slug: reskill
-
-notification:
-  channel: openclaw-weixin
-  target: "xxx@im.wechat"
-  enabled: true
-
-schedule:
-  enabled: true
-  cron: "0 9 * * *"  # 每天09:00
-```
-
-### 第二步：验证配置
-
-```
-AI用token调API，确认能访问仓库
-→ “配置成功，已开始监控”
-```
-
-### 第三步：自动运行
-
-```
-按schedule定期检查issues
-→ 提取有效反馈
-→ 通过notification渠道提醒作者
-→ 持续循环
-```
-
----
-
-## GitHub Skill 生命周期管理（已固化）
-
-> 来源：https://agentskills.io/specification.md + gh CLI v2.94.0 实测
-> 最后更新：2026-08-11
-> 规范版本：v1.0.0（Agent Skills Specification）
-
-### 发布/更新结构要求
-
-#### 仓库要求
-| 要求 | 说明 |
-|------|------|
-| 仓库类型 | 必须 public |
-| Topic | 必须包含 `agent-skills` |
-| License | 推荐包含（MIT 等） |
-| Release | 每个版本必须有对应 tag + release |
-
-#### SKILL.md frontmatter 要求
-| 字段 | 必填 | 规则 |
-|------|------|------|
-| name | ✅ | 1-64字符，仅小写字母数字连字符，首尾/连续连字符不允许，必须与目录名相同 |
-| description | ✅ | 1-1024字符，描述用途+触发场景 |
-| license | ❌ | 许可证名称或文件引用 |
-| compatibility | ❌ | 环境要求（≤500字符） |
-| metadata | ❌ | 任意 key-value 映射 |
-| allowed-tools | ❌ | 空格分隔的预授权工具（必须是字符串，不是数组） |
-
-#### 仓库结构（Skill 发现约定）
-```
-# 单 skill 仓库（根级别）
-repo-name/
-├── SKILL.md          # 必需
-├── README.md         # 推荐
-├── scripts/          # 可选
-├── references/       # 可选
-├── assets/           # 可选
-├── LICENSE           # 推荐
-└── .gitignore        # 推荐
-
-# 多 skill 仓库
-repo-name/
-├── skills/
-│   ├── skill-a/
-│   │   └── SKILL.md
-│   └── skill-b/
-│       └── SKILL.md
-└── README.md
-```
-
-Skill 发现路径（gh skill install 实测）：
-- `skills/*/SKILL.md`
-- `skills/{scope}/*/SKILL.md`
-- `*/SKILL.md`（根级别）
-- `plugins/{scope}/skills/*/SKILL.md`
-
-#### 渐进式披露
-| 层级 | 内容 | Token 预算 | 加载时机 |
-|------|------|-----------|----------|
-| 元数据 | name + description | ~100 tokens | 启动时 |
-| 指令 | SKILL.md 正文 | <5000 tokens | 激活时 |
-| 资源 | scripts/references/assets | 按需 | 需要时 |
-
-### 发布流程（gh skill publish）
-
+**流程**：
 ```bash
-# 1. 凭据扫描（reskill 强制闸门）
-bash scripts/preflight_secret_scan.sh .
+# 1. 初始化 git 仓库（如果还没有）
+git init
+git add -A
+git commit -m "init: <skill-name> v<version> for GitHub Agent Skills"
 
-# 2. 验证（不发布）
+# 2. 创建 GitHub 仓库（如果还没有）
+gh repo create <owner>/<repo-name> --public --source=. --remote=origin
+
+# 3. 推送代码
+git push -u origin main
+
+# 4. 创建 tag（如果还没有）
+git tag v<version>
+gh release create v<version> --title "<skill-name> v<version>" --notes-file /dev/stdin
+
+# 5. 验证 skill（注意：gh skill publish 有已知 bug，见 3.1.1）
 gh skill publish --dry-run
-
-# 3. 自动修复可修复问题（如剥离 install metadata）
-gh skill publish --fix
-# 审查改动后 commit，再重新 publish
-
-# 4. 发布（指定 tag）
-gh skill publish --tag v1.2.0
 ```
 
-`gh skill publish` 会自动：
-- 添加 `agent-skills` topic
-- 创建 GitHub release（自动生成 release notes）
-- 剥离 install metadata（`metadata.github-*`）
-- 验证 frontmatter 合法性
+**3.1.1 已知问题：gh skill publish 验证 bug**
 
-### 更新流程（gh skill update）
+`gh skill publish --dry-run` 在 v2.97.0 及更早版本中存在稳定复现的验证错误：
+```
+error <skill-name> name "<skill-name>" does not match directory name "."
+```
+
+无论怎么指定目录参数（`.`、绝对路径、相对路径），该错误始终出现。
+
+**Workaround**：
+- 手动完成发布流程（git push + gh release create）
+- 或等待 GitHub CLI 修复
+- 该 bug 不影响 skill 的实际使用，只影响 `gh skill publish` 的自动验证步骤
+
+**已确认**：本 skill 已通过手动方式成功发布到 GitHub（totwo2/reskill、totwo2/zhi-py-opt、totwo2/da-jia-answer、totwo2/quibbler）。
+
+---
+
+### 3.2 检查反馈（feedback-collector.md）
+
+**触发**：用户说"检查反馈"、"有没有issue"等
+
+**流程**：
+1. 读取 `settings/reskill_config.yaml`，获取仓库列表
+2. 对每个仓库：
+   - 调用 GitHub/Gitee API 获取 issues
+   - 过滤有效反馈（非重复、非已解决）
+   - 提取关键信息（问题类型、严重程度、用户情绪）
+3. 汇总结果，按优先级排序
+4. 通过当前会话渠道通知用户
+
+**输出格式**：
+```
+📊 反馈检查报告（2026-08-11）
+
+reskill（totwo2/reskill）
+- 新增 2 个 issue
+- 高优先级：1（gh skill publish 验证 bug）
+- 中优先级：1（文档建议）
+- 低优先级：0
+
+建议处理：
+1. [高] 回复 issue #3，说明 gh skill publish bug 的 workaround
+2. [中] 更新 README.md，补充使用示例
+```
+
+---
+
+### 3.3 下载量追踪（scripts/check_downloads.py）
+
+**触发**：用户说"下载量"、"下载趋势"等
+
+**脚本**：`scripts/check_downloads.py`
+
+**用法**：
+```bash
+python3 scripts/check_downloads.py --skill <slug> --api-base https://api.skillhub.cn
+```
+
+**输出**：
+- 当前下载量
+- 与上次快照对比（增量）
+- 如果有新下载，触发通知
+
+---
+
+### 3.4 名下 skill 同步（scripts/fetch_my_skills.py）
+
+**触发**：用户说"同步skill列表"、"查名下skill"等
+
+**脚本**：`scripts/fetch_my_skills.py`
+
+**用法**：
+```bash
+python3 scripts/fetch_my_skills.py --handle <github-username> --api-base https://api.skillhub.cn
+```
+
+**输出**：
+- SkillHub 上该用户名下的所有 skill 列表
+- 与本地 skill 目录对比
+- 缺失/过期提醒
+
+---
+
+### 3.5 配置通知（notification.md）
+
+**触发**：用户说"配置通知"、"飞书通知我"等
+
+**支持的渠道**：
+- 微信（openclaw-weixin）
+- 飞书（feishu webhook）
+- 钉钉（dingtalk webhook）
+- Telegram（bot token + chat id）
+
+**配置方式**：
+1. 用户提供渠道类型和接收地址
+2. AI 写入 `settings/notify_config.yaml`
+3. 发送测试消息验证
+4. 启用定时检查
+
+---
+
+## 4. 错误处理
+
+### 4.1 常见错误
+
+| 错误 | 原因 | 处理 |
+|------|------|------|
+| `gh skill publish` 报 directory name 错误 | v2.97.0 bug | 跳过验证，手动完成发布 |
+| API 返回 401 | Token 无效 | 提示用户更新 token |
+| API 返回 404 | 仓库不存在 | 检查仓库地址拼写 |
+| 网络超时 | GitHub/Gitee 访问慢 | 重试或使用代理 |
+| 凭据扫描失败 | 发现敏感信息 | 中止发布，提示用户清理 |
+
+### 4.2 重试策略
+
+- 网络请求：最多重试 3 次，间隔指数退避
+- 工具调用失败：换方案（如 web_search 替代 web_fetch）
+- 子代理失败：降级为单代理串行，向用户明示
+
+---
+
+## 5. 数据流
+
+```
+用户输入
+  → 触发词匹配
+  → 读取配置（reskill_config.yaml）
+  → 执行对应模块
+  → 输出结果
+  → 通知用户（如果配置了）
+```
+
+---
+
+## 6. 与其他 skill 的协作
+
+- **find-skills**：搜索其他 skill 时，find-skills 会调用 reskill 的 `fetch_my_skills.py` 同步名下 skill
+- **skillhub-preference**：skill 安装偏好管理，与 reskill 的发布流程互补
+
+---
+
+## 7. 快速命令参考
 
 ```bash
-# 更新所有已安装 skill
-gh skill update --all
+# 发布流程
+bash scripts/preflight_secret_scan.sh .
+git init && git add -A && git commit -m "init"
+gh repo create <owner>/<repo> --public --source=. --remote=origin
+git push -u origin main
+git tag v<version> && gh release create v<version>
 
-# 更新指定 skill
-gh skill update <owner>/<repo>
+# 反馈检查
+python3 scripts/fetch_my_skills.py --handle <username>
+python3 scripts/check_downloads.py --skill <slug>
+
+# 凭据扫描
+bash scripts/preflight_secret_scan.sh .
 ```
 
-版本解析优先级：
-1. 最新 tagged release
-2. 默认分支 HEAD
+---
 
-固定版本：
-```bash
-# 方式1：在 skill 名后加 @version
-gh skill install github/awesome-copilot git-commit@v1.2.0
-
-# 方式2：--pin 标志
-gh skill install github/awesome-copilot git-commit --pin v1.2.0
-```
-
-已安装 skill 的 frontmatter 会注入 source tracking metadata，用于 update 检测变化。
-
-### 与 SkillHub 发布的关键差异
-| 维度 | gh skill publish | skillhub publish |
-|------|-----------------|------------------|
-| 凭据扫描 | 无强制（依赖 GitHub Secret scanning） | **强制**（preflight_secret_scan.sh） |
-| 打包方式 | 仓库即目录，不打包 | 打包 zip，`.gitignore` 无效 |
-| 发布前处理 | 自动剥离 install metadata | 需手动移走含 token 文件 |
-| 索引机制 | GitHub API + topic 搜索 | SkillHub 自有市场 |
-| 网络要求 | 需访问 github.com | 国内 skillhub.cn 高速 |
-
-### 发布检查清单（每次发布前）
-- [ ] 已跑 `bash scripts/preflight_secret_scan.sh .` 且退出码 0（硬性前置）
-- [ ] SKILL.md frontmatter name 1-64 字符（小写字母数字连字符）
-- [ ] description 1-1024 字符，含触发关键词
-- [ ] name 与目录名相同
-- [ ] allowed-tools 是字符串（不是数组）
-- [ ] 仓库 public + `agent-skills` topic 已加
-- [ ] LICENSE 文件存在
-- [ ] 每个版本有对应 tag + release
-- [ ] 已跑 `gh skill publish --dry-run` 看到 ✅
-- [ ] 已跑 `python3 scripts/gh_skill.py check-spec` 确认规范未变
-
-### 规范变更检测
-
-reskill 提供 `gh_skill.py check-spec` 自动检测规范变化：
-- agentskills.io 规范文档最后修改时间
-- gh CLI 版本和子命令变化
-- 本地固化规范版本
-- 已知 skill 仓库最近推送
-
-当规范更新时，手动更新本 SKILL.md 和 publish.md 中的规范章节。
-```
+*最后更新：2026-08-11*
