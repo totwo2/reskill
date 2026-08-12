@@ -4,20 +4,52 @@
 
 ---
 
+## 凭据扫描：边界与责任
+
+**扫描是发布期闸门，只保护开发者，不检查用户数据。**
+
+| 角色 | 谁的数据 | 是否扫描 | 在哪里 |
+|---|---|---|---|
+| **开发者**（写 reskill、上传 GitHub/Gitee 仓库的人） | reskill_config.yaml.example、SKILL.md、scripts/*、download_history.yaml 里的示例值 | **必扫** | 即将 commit / push 的文件 |
+| **最终用户**（下载 reskill 跑监控的人） | settings/reskill_config.yaml（真实 token）、settings/download_history.yaml（自己的下载快照）、settings/feedback_report.md、settings/my_skills_snapshot.yaml | **绝不扫描** | 用户的本地 settings/ 目录 |
+
+**边界划分原则：**
+
+1. **reskill_config.yaml.example**（脱敏模板、公开入库）→ 必须扫，确保无真实凭据
+2. **settings/reskill_config.yaml**（用户实例、含真实 token）→ 必须被 `.gitignore` 排除，绝不入库
+3. **下载快照、反馈报告、名下快照**（用户运行时数据）→ 全部被 `.gitignore` 排除
+4. **scripts/preflight_secret_scan.sh** 默认走 `.gitignore` 范围（开发者视角），加 `--all` 才扫所有（仅 skillhub publish 临时使用）
+
+**为什么这样划分：**
+
+- 凭据扫描的目的是**保护开发者不因疏忽推 token 到公开仓库**
+- 用户的 token 是用户自己的资产，必须保留在本地、必须升级时不丢
+- 扫描用户数据 = 破坏升级体验（升级不能要求用户重新填 token）+ 侵犯隐私
+
+**如果发现扫描命中用户 settings/ 下的文件：**
+
+- 立即停止扫描
+- 检查 `.gitignore` 是否已排除该文件（`settings/*`）
+- 如果已排除但扫描仍命中 → 升级扫描器逻辑，跳过 `.gitignore` 内的文件
+- 绝不向用户报错 "你的 token 泄露了"（这是误报，用户 token 本就在 settings/）
+
+---
+
 ## ☠️ 发布前硬性红线（每次必做，不可跳过）
 
 **任何 git push / skillhub publish 之前，必须先跑凭据扫描：**
 
 ```bash
-# git push 前（尊重 .gitignore，只扫将入库的文件）
+# git push 前（尊重 .gitignore，只扫将入库的文件——这是日常使用方式）
 bash scripts/preflight_secret_scan.sh .
 
-# skillhub publish 前（打包不看 .gitignore，扫全部文件）
+# skillhub publish 前（打包不看 .gitignore，扫全部文件——临时使用）
 bash scripts/preflight_secret_scan.sh . --all
 ```
 
 - 退出码 **0** = 通过，才能发布。
 - 退出码 **1** = 命中凭据，**立即中止发布**，先把凭据移出仓库（改用 `*.example.*` 脱敏 + `.gitignore`）再重扫。
+- **扫描不命中用户 settings/ 下的真实 token**——见上面"凭据扫描：边界与责任"章节
 
 历史教训（2026-06-12 `50c6124` 提交把 gitee token 明文推入公开仓库，汄露约一个月）：
 1. 仓库从建立起无 `.gitignore` → 无机制阻止敏感文件入库

@@ -1,7 +1,7 @@
 ---
 name: reskill
 slug: reskill
-version: 1.2.0
+version: 1.4.0-dev
 displayName: Skill发布与反馈优化系统
 description: |
   Skill发布、用户反馈收集与持续优化系统。发布skill到Gitee/GitHub/SkillHub，
