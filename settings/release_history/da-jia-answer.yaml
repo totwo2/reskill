@@ -1,0 +1,17 @@
+# totwo2/da-jia-answer release 历史
+
+releases:
+
+- time: "2026-08-11 12:11:15"
+  repo: totwo2/da-jia-answer
+  tag: v0.0.1
+  dry_run: True
+  errors: 0
+  warnings: 1
+
+- time: "2026-08-11 12:12:52"
+  repo: totwo2/da-jia-answer
+  tag: v1.0.1
+  dry_run: False
+  errors: 0
+  warnings: 1

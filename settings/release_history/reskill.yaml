@@ -1,0 +1,25 @@
+# totwo2/reskill release 历史
+
+releases:
+
+- time: "2026-08-11 12:09:34"
+  repo: totwo2/reskill
+  tag: v1.2.0
+  dry_run: True
+  errors: 0
+  warnings: 1
+
+- time: "2026-08-11 12:09:49"
+  repo: totwo2/reskill
+  tag: v1.2.0
+  dry_run: False
+  errors: 0
+  warnings: 1
+
+- time: "2026-08-11 12:39:54"
+  action: publish
+  repo: totwo2/reskill
+  tag: v1.3.0
+  dry_run: True
+  scan_passed: True
+  findings: 0

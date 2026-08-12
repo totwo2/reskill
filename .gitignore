@@ -1,0 +1,16 @@
+# Local config (contains real tokens)
+settings/reskill_config.yaml
+settings/notify_config.yaml
+settings/cron_config.yaml
+
+# Runtime artifacts (local monitoring data, do not publish)
+settings/download_history.yaml
+settings/feedback_report.md
+settings/my_skills_snapshot.yaml
+scripts/feedback_report.md
+
+# SkillHub metadata
+_meta.json
+
+# OS
+.DS_Store

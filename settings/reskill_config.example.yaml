@@ -1,0 +1,51 @@
+repo:
+  platform: gitee
+  owner: gaoooyc
+  repos:
+    - name: everytime-novel
+      skillhub_id: "87148"
+    - name: reskill
+      skillhub_id: "87149"
+    - name: da-jia-dou-lai-hui-da
+      skillhub_id: "99921"
+    - name: quibbler
+      skillhub_id: "148585"
+  token: "YOUR_GITEE_TOKEN_HERE"
+
+github:
+  platform: github
+  owner: YOUR_GITHUB_USERNAME
+  repos:
+    - name: reskill
+    - name: zhi-py-opt
+    - name: quibbler
+    - name: da-jia-answer
+  token: "YOUR_GITHUB_PAT_HERE"
+
+skillhub:
+  api_base: "https://api.skillhub.cn"
+  skills:
+    - slug: everytime-novel
+      display_name: "全流程网络小说写作系统"
+    - slug: reskill
+      display_name: "Skill发布与反馈优化系统"
+    - slug: zhi-neng-py-jiao-ben-you-hua
+      display_name: "智能py脚本优化"
+    - slug: da-jia-dou-lai-hui-da
+      display_name: "大家都来回答"
+    - slug: quibbler
+      display_name: "唱唱反调·人群模拟器"
+    - slug: tmeetpeople
+      display_name: "二创tmeet人员管理版"
+    - slug: fangdai-haiyao-hai-duojiu
+      display_name: "房贷还要还多久"
+
+notification:
+  channel: openclaw-weixin
+  target: "YOUR_WECHAT_TARGET_HERE"
+  enabled: true
+
+schedule:
+  enabled: true
+  cron: "0 9 * * *"
+  last_check: "2026-08-11"
