@@ -1,0 +1,17 @@
+# totwo2/zhi-py-opt release 历史
+
+releases:
+
+- time: "2026-08-11 12:11:10"
+  repo: totwo2/zhi-py-opt
+  tag: v0.0.1
+  dry_run: True
+  errors: 0
+  warnings: 1
+
+- time: "2026-08-11 12:11:43"
+  repo: totwo2/zhi-py-opt
+  tag: v2.0.1
+  dry_run: False
+  errors: 0
+  warnings: 1

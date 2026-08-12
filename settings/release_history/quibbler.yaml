@@ -1,0 +1,17 @@
+# totwo2/quibbler release 历史
+
+releases:
+
+- time: "2026-08-11 12:11:13"
+  repo: totwo2/quibbler
+  tag: v0.0.1
+  dry_run: True
+  errors: 0
+  warnings: 0
+
+- time: "2026-08-11 12:12:46"
+  repo: totwo2/quibbler
+  tag: v1.0.0
+  dry_run: False
+  errors: 0
+  warnings: 0
