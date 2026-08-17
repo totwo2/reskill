@@ -41,7 +41,7 @@ skillhub:
       display_name: "房贷还要还多久"
 
 notification:
-  channel: openclaw-weixin
+  channel: session
   target: "YOUR_WECHAT_TARGET_HERE"
   enabled: true
 

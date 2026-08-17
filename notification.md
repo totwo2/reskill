@@ -8,7 +8,8 @@
 
 | 渠道 | 配置方式 | 说明 |
 |------|----------|------|
-| 微信 | openclaw-weixin | 默认，已配置 |
+| 当前会话 | session | WorkBuddy 默认，直接在对话里报告（替代 openclaw-weixin） |
+| 微信 | openclaw-weixin | 旧 OpenClaw 渠道，WorkBuddy 下不可用 |
 | 飞书 | feishu webhook | 需要webhook地址 |
 | 钉钉 | dingtalk webhook | 需要webhook地址 |
 | Telegram | telegram bot | 需要bot token + chat_id |
@@ -25,8 +26,8 @@
 ```yaml
 # 通知配置
 channels:
-  - name: 微信
-    type: openclaw-weixin
+  - name: 当前会话
+    type: session
     enabled: true
     events:
       - new_feedback    # 有新反馈
@@ -145,11 +146,13 @@ curl -X POST "https://api.telegram.org/bot{token}/sendMessage" \
 
 ---
 
-## 默认行为
+## 默认行为（WorkBuddy 适配）
 
-如果用户没有配置 `notify_config.yaml`：
-- 默认使用当前会话渠道推送（微信/飞书/钉钉，取决于用户在哪聊）
-- 不主动推送，只在用户问"有没有反馈"时才检查
+- **默认渠道 = `session`**：直接在 WorkBuddy 当前对话里报告，无需额外配置。
+- 旧 OpenClaw 的 `openclaw-weixin` 渠道在 WorkBuddy 下不可用，已改为 `session`。
+- 飞书/钉钉/Telegram/Discord/企业微信 webhook 仍可用（curl 推送，跨平台通用）。
+- 想要离线推送（不在线也能收到）：可改用 `agent-mail` 邮件，或配置上述 webhook。
+- 不主动推送，只在用户问"有没有反馈/下载量"时才检查（或挂自动化每日 09:00）。
 
 ---
 

@@ -155,6 +155,55 @@ git push -u origin master
 
 ---
 
+## 发布到 GitHub Release（gh release create）专用 playbook
+
+> 裸 `git push` + tag **不算正式发布**。GitHub Release = tag + 标题 + 发布说明 + 自动 zip/tarball，用户才能在 Releases 页订阅/下载。**必须建 Release，不能只推 tag。**
+> （selfopt 曾只推了 tag 没建 Release，后补 `gh release create v2.0.3` 才补齐。）
+
+### 关键认知：tag ≠ Release
+- **tag** 只是历史锚点（Git ref），无标题、无说明、无下载入口。
+- **GitHub Release** 建立在 tag 之上，带标题 + 发布说明 + 自动下载包，是正式"发布"。
+- `gh release create <tag>`：tag 不存在时**自动从默认分支最新状态建 tag + Release 一步到位**；tag 已存在则直接挂 Release。
+
+### 首次发布（gh）
+
+```bash
+1. 代码已 commit 到 master/main（含双语 README、LICENSE、SKILL.md 的 slug/displayName）
+2. 建仓库（若还没有）：
+   gh repo create {仓库名} --public --description "{描述}"
+3. git push -u origin master
+4. 建首个 Release（自动建 tag + Release）：
+   gh release create v1.0 -t "v1.0 {一句话}" -n "{发布说明，gh 侧用双语}"
+5. git fetch --tags origin   # 把新 tag 拉回本地
+6. 同步发 sh（中文 README，同版本号）—— 走"双发软件两边一起发"纪律
+```
+
+### 后续增量发布（gh）
+
+```bash
+1. 改完代码，commit 到 master/main
+2. 先定版本号并和 sh 对齐（两边同 numeric 版本；gh 带 v，sh 不带）
+3. gh release create vX.Y.Z --generate-notes
+   # --generate-notes：调用 Release Notes API 自动汇总上次 Release 以来的 commit，生成标题+说明，默认标 latest
+   # 想手写说明：-F changelog.md 或 -n "..."
+4. git fetch --tags origin   # 同步本地 tag
+5. 立刻发 sh 同版本（临时换中文 README → skillhub publish . --version X.Y.Z → 恢复双语 README）
+```
+
+### 可选参数
+- `-t/--title` 标题；`--latest`（默认）标最新；`-p/--prerelease` / `-d/--draft`
+- `--verify-tag`：若先在本地建 tag 再确保远端已存在，用它兜底
+- 建完 `git fetch --tags origin` 把新 tag 拉回本地
+
+### 我们这边的固定约束（叠加在官方流程上）
+- **SemVer**：`v主.次.修`；gh tag 带 `v`、sh 去 `v`、数字一致。
+- **README 分流**：gh README 保持**双语**（repo 源文件）；sh 才临时换**单语中文**——两边下载包内容天然分流，符合"gh 双语 / sh 中文"规范。
+- **发布说明**：gh 侧用双语（面向 gh 受众）；sh changelog 用中文。
+- **双发纪律**：双发软件（gh + sh）更新必须两边同步、同版本号一起发，不单方面漏一边。
+- ⚠️ **SkillHub 不允许同版本重发**（报 `slug 冲突: 版本 X 已存在，请使用新的版本号发布`）。故"同版本改成中文"走不通，只能两平台同升一个新版本号来满足"sh 中文 + 版本一致"。
+
+---
+
 ## 版本号规范
 
 ```

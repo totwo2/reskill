@@ -12,5 +12,13 @@ scripts/feedback_report.md
 # SkillHub metadata
 _meta.json
 
+# Python cache
+scripts/__pycache__/
+__pycache__/
+*.pyc
+
+# Runtime state (local, do not publish)
+settings/daily_state.json
+
 # OS
 .DS_Store
