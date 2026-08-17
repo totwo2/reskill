@@ -24,7 +24,7 @@ A complete toolkit for AI agent skill creators: publish to SkillHub/Gitee/GitHub
 gh skill install {owner} reskill
 
 # From SkillHub (CN)
-skillhub install reskill --namespace <your-skillhub-handle>
+skillhub install reskill --namespace <your-skillhub-namespace>
 ```
 
 ## Quick start
