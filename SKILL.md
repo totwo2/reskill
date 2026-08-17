@@ -1,14 +1,16 @@
 ---
 name: reskill
 slug: reskill
-version: 1.4.0
+version: 2.0.4
 displayName: Skill发布与反馈优化系统
 description: |
   Skill发布、用户反馈收集与持续优化系统。发布skill到Gitee/GitHub/SkillHub，
   自动同步名下已发布skill列表，定期检查用户意见，提取有效反馈，
   提醒作者决策，自动优化skill。支持下载量趋势追踪（有新下载自动提醒）、
-  发布前凭据扫描、多渠道消息通知（微信/飞书/钉钉/Telegram）。
+  发布前凭据扫描、多渠道消息通知（当前会话/飞书/钉钉/Telegram/邮件）。
   触发词：发布skill、检查反馈、用户意见、优化skill、更新skill、配置通知、下载量、下载趋势、同步skill列表、查名下skill
+license: MIT
+allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 ---
 
 # reskill — Skill发布与反馈优化系统
@@ -117,7 +119,7 @@ skillhub:
     - slug: reskill
 
 notification:
-  channel: openclaw-weixin
+  channel: session
   target: "xxx@im.wechat"
   enabled: true
 

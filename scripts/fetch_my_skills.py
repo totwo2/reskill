@@ -10,7 +10,7 @@ reskill v1.3.0 — 同步 SkillHub 名下 skill 列表
       以及一份机器可读 diff 给外层提示。
 用法: python3 fetch_my_skills.py [--dry-run] [--token TOKEN] [--handle HANDLE]
 """
-import json, urllib.request, urllib.error, os, sys, argparse, datetime, re, yaml
+import json, urllib.request, urllib.error, os, sys, argparse, datetime, re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SETTINGS = os.path.join(os.path.dirname(HERE), "settings")
@@ -22,6 +22,7 @@ API_BASE = "https://api.skillhub.cn"
 def load_config():
     """读 yaml 配置，缺 PyYAML 时回退到最小解析（仅顶层 skillhub.skills）。"""
     try:
+        import yaml
         with open(CONFIG, encoding="utf-8") as f:
             return yaml.safe_load(f)
     except ImportError:
