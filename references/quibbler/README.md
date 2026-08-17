@@ -21,7 +21,7 @@ Supports 8 material types: `CODE` · `WEB` · `VIDEO` · `NOVEL` · `DOC` · `DE
 gh skill install {owner} quibbler
 
 # From SkillHub (CN)
-skillhub install quibbler --namespace user_c18b02ff
+skillhub install quibbler --namespace <your-skillhub-namespace>
 ```
 
 Zero dependencies — Node 22+ built-in modules only.
@@ -120,7 +120,7 @@ MIT
 gh skill install {owner} quibbler
 
 # SkillHub (国内)
-skillhub install quibbler --namespace user_c18b02ff
+skillhub install quibbler --namespace <your-skillhub-namespace>
 ```
 
 零依赖，仅需 Node 22+。
