@@ -57,7 +57,35 @@ bash scripts/preflight_secret_scan.sh . --all
 3. 发布前无凭据扫描
 → 三道防线现均已补：`.gitignore` + `*.example.*` 脱敏 + 本扫描器。
 
-**skillhub publish 特别注意**：打包不遵守 `.gitignore`，发布前必须把含 token 的 `settings/reskill_config.yaml`、`download_history.yaml`、`feedback_report.md` 临时移出目录（以及 `.gitignore` 本身，skillhub 不接受该文件类型），发布后再移回。
+**skillhub publish 特别注意**：打包不遵守 `.gitignore`，发布前必须把**全部个人实例数据**临时移出目录（以及 `.gitignore` 本身，skillhub 不接受该文件类型），发布后再移回。完整清单（2026-08-18 校准，覆盖所有运行时产物）：
+
+```bash
+# 发布前：移出个人实例数据（skillhub 打包不看 .gitignore，不移必漏）
+mkdir -p /tmp/reskill_publish_exclude
+cd {skill目录}
+mv settings/reskill_config.yaml settings/download_history.yaml \
+   settings/feedback_report.md settings/my_skills_snapshot.yaml \
+   settings/daily_state.json \
+   settings/release_history .workbuddy _meta.json \
+   /tmp/reskill_publish_exclude/
+mv .gitignore /tmp/reskill_publish_exclude/   # skillhub 不接受该文件类型
+
+# skillhub publish ...
+
+# 发布后：全部移回
+mv /tmp/reskill_publish_exclude/reskill_config.yaml \
+   /tmp/reskill_publish_exclude/download_history.yaml \
+   /tmp/reskill_publish_exclude/feedback_report.md \
+   /tmp/reskill_publish_exclude/my_skills_snapshot.yaml \
+   /tmp/reskill_publish_exclude/daily_state.json \
+   /tmp/reskill_publish_exclude/release_history \
+   /tmp/reskill_publish_exclude/.workbuddy \
+   /tmp/reskill_publish_exclude/_meta.json \
+   settings/ 2>/dev/null; mv /tmp/reskill_publish_exclude/.gitignore .
+rmdir /tmp/reskill_publish_exclude
+```
+
+发布前可跑 `git ls-files` 检查进包清单，确认 `settings/` 下**只剩 `reskill_config.example.yaml`**（脱敏模板）——这是"干净发布"的硬标准。
 
 ---
 
