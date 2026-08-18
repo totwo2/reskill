@@ -22,3 +22,9 @@ settings/daily_state.json
 
 # OS
 .DS_Store
+
+# Platform automation state (local env, do not publish)
+.workbuddy/
+
+# Author runtime publish logs (instance data, not template content)
+settings/release_history/

@@ -19,28 +19,54 @@ SNAPSHOT = os.path.join(SETTINGS, "my_skills_snapshot.yaml")
 API_BASE = "https://api.skillhub.cn"
 
 
+def _parse_skills_block(block):
+    """无 PyYAML 回退：解析 skillhub.skills 段（不依赖 PyYAML 也必须正确）。
+    兼容两种条目顺序：
+      - slug: xxx        （slug 带 `-` 前缀）
+        display_name: ...
+      - display_name: ...  （display_name 带 `-` 前缀，slug 不带——实测 config 形态）
+        slug: xxx
+    修复点（2026-08-18）：旧实现只认 `- slug:` 开头，而实测 config 是
+    `- display_name:` 在 `slug:` 之上 → 解析出 0 个 → 全部误报为"新增"。
+    """
+    import re as _re
+    def _decode_name(s):
+        """解码 YAML 双引号字符串里的 \\uXXXX 转义（如 \\u667A → 智）。"""
+        return _re.sub(r"\\u([0-9a-fA-F]{4})",
+                       lambda m: chr(int(m.group(1), 16)), s)
+    skills, cur = [], None
+    for line in block.splitlines():
+        ls = line.strip()
+        if ls.startswith("- slug:") or ls.startswith("- display_name:"):
+            if cur:
+                skills.append(cur)
+            cur = {}
+            key = "slug" if ls.startswith("- slug:") else "display_name"
+            cur[key] = _decode_name(ls.split(":", 1)[1].strip().strip('"'))
+        elif cur is not None and ls.startswith(("slug:", "display_name:")):
+            key = ls.split(":", 1)[0].strip()
+            if key in cur:
+                continue
+            cur[key] = _decode_name(ls.split(":", 1)[1].strip().strip('"'))
+    if cur:
+        skills.append(cur)
+    return [s for s in skills if s.get("slug")]  # 只要带 slug 的条目
+
+
 def load_config():
-    """读 yaml 配置，缺 PyYAML 时回退到最小解析（仅顶层 skillhub.skills）。"""
+    """读 yaml 配置，缺 PyYAML 时回退到手工解析（修复后与 PyYAML 结果一致）。"""
     try:
         import yaml
         with open(CONFIG, encoding="utf-8") as f:
             return yaml.safe_load(f)
     except ImportError:
-        # 没有 PyYAML：用正则手工解析 skillhub.skills 段
+        # 没有 PyYAML：手工解析 skillhub.skills 段
         cfg = {"skillhub": {"skills": []}}
         txt = open(CONFIG, encoding="utf-8").read()
         m = re.search(r"^skillhub:\s*\n((?:  [^\n]*\n)+)", txt, re.MULTILINE)
         if not m:
             return cfg
-        block = m.group(1)
-        cur = None
-        for line in block.splitlines():
-            line_s = line.strip()
-            if line_s.startswith("- slug:"):
-                cur = {"slug": line_s.split(":", 1)[1].strip()}
-                cfg["skillhub"]["skills"].append(cur)
-            elif cur and line_s.startswith("display_name:"):
-                cur["display_name"] = line_s.split(":", 1)[1].strip().strip('"')
+        cfg["skillhub"]["skills"] = _parse_skills_block(m.group(1))
         return cfg
 
 
