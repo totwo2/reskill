@@ -80,7 +80,7 @@ channels:
 📢 新反馈提醒
 
 Skill: {skill名}
-平台: Gitee/GitHub
+平台: GitHub
 新issue: {N}条
 
 有效反馈:
@@ -102,7 +102,7 @@ Skill: {skill名}
 - {修改1}
 - {修改2}
 
-回复"发布"推送到Gitee/GitHub。
+回复"发布"推送到GitHub。
 ```
 
 ---

@@ -8,7 +8,7 @@
 
 reskill 是一个 **Skill 发布、反馈收集与持续优化系统**。核心功能：
 
-1. **发布 Skill** — 推送到 Gitee/GitHub/SkillHub，版本管理
+1. **发布 Skill** — 推送到 GitHub/SkillHub，版本管理
 2. **收集反馈** — 定期检查 Issues，提取有效反馈，提醒作者
 3. **下载追踪** — 监控 SkillHub 下载量趋势，有新下载自动提醒
 4. **通知推送** — 多渠道通知（微信/飞书/钉钉/Telegram）
@@ -65,13 +65,13 @@ reskill 是一个 **Skill 发布、反馈收集与持续优化系统**。核心�
 
 **内容**：
 ```yaml
-repo:                          # Gitee 配置
-  platform: gitee
+repo:                          # GitHub 配置
+  platform: github
   owner: <your-gitee-account>
   repos:
     - name: reskill
       skillhub_id: '87149'     # SkillHub 上的 ID
-  token: "YOUR_GITEE_TOKEN"    # ⚠️ 真实 token，不入库
+  token: "YOUR_GITHUB_TOKEN"    # ⚠️ 真实 token，不入库
 
 github:                        # GitHub 配置（可选）
   platform: github
@@ -199,13 +199,13 @@ python3 scripts/check_downloads.py
 
 | 文件 | Token 类型 | 用途 |
 |------|-----------|------|
-| `settings/reskill_config.yaml` | Gitee + GitHub PAT | API 访问 |
+| `settings/reskill_config.yaml` | GitHub PAT | API 访问 |
 | `~/.skillhub/credentials.json` | SkillHub skh_ 开头 | SkillHub API |
 | `settings/notify_config.yaml` | 微信/飞书/钉钉 token | 通知推送 |
 
 ### 5.3 历史事故（2026-06-12）
 
-- **问题**：仓库从建立起无 `.gitignore`，Gitee token 明文推入公开仓库，泄露约一个月
+- **问题**：仓库从建立起无 `.gitignore`，GitHub token 明文推入公开仓库，泄露约一个月
 - **修复**：补全 `.gitignore` + 脱敏模板 + 凭据扫描脚本
 - **教训**：凭据一旦入公开库 = 已泄露，必须重置
 
@@ -279,7 +279,7 @@ schedule:
 ## 八、常见问题
 
 ### Q: token 泄露了怎么办？
-A: 立即去 Gitee/GitHub/SkillHub 重置 token，然后更新 `settings/reskill_config.yaml`
+A: 立即去 GitHub/SkillHub 重置 token，然后更新 `settings/reskill_config.yaml`
 
 ### Q: skillhub publish 报错？
 A: 检查是否移走了含 token 的文件和 `.gitignore`
@@ -306,7 +306,7 @@ A: 编辑 `settings/notify_config.yaml`，或告诉 AI 切换
 
 ## 十、联系与维护
 
-- **仓库**：`gitee.com/<your-gitee-account>/reskill`
+- **仓库**：`github.com/totwo2/reskill`
 - **SkillHub**：`https://skillhub.cn/skills/reskill`
 - **版本号**：1.4.0
 - **最后更新**：2026-08-17

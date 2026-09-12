@@ -1,44 +1,44 @@
-repo:
-  platform: gitee
-  owner: <your-gitee-account>
-  repos:
-    - name: everytime-novel
-      skillhub_id: "87148"
-    - name: reskill
-      skillhub_id: "87149"
-    - name: da-jia-dou-lai-hui-da
-      skillhub_id: "99921"
-    - name: quibbler
-      skillhub_id: "148585"
-  token: "YOUR_GITEE_TOKEN_HERE"
-
 github:
   platform: github
   owner: YOUR_GITHUB_USERNAME
   repos:
     - name: reskill
+    - name: no-bb
+    - name: selfopt
     - name: zhi-py-opt
     - name: quibbler
     - name: da-jia-answer
+    - name: nm-agents
+    - name: N_M_memory
+    - name: NM
+    - name: memory-replay-installer
   token: "YOUR_GITHUB_PAT_HERE"
 
 skillhub:
   api_base: "https://api.skillhub.cn"
   skills:
-    - slug: everytime-novel
-      display_name: "全流程网络小说写作系统"
     - slug: reskill
-      display_name: "Skill发布与反馈优化系统"
+      display_name: "Skill发布质量闸门与反馈系统"
+    - slug: no-bb
+      display_name: "No BB 中间层"
     - slug: zhi-neng-py-jiao-ben-you-hua
       display_name: "智能py脚本优化"
+    - slug: everytime-novel
+      display_name: "全流程网络小说写作系统"
+    - slug: quibbler
+      display_name: "唱唱反调 The Quibbler"
     - slug: da-jia-dou-lai-hui-da
       display_name: "大家都来回答"
-    - slug: quibbler
-      display_name: "唱唱反调·人群模拟器"
     - slug: tmeetpeople
       display_name: "二创tmeet人员管理版"
     - slug: fangdai-haiyao-hai-duojiu
       display_name: "房贷还要还多久"
+    - slug: nm-memory
+      display_name: "NM Memory"
+    - slug: memory-replay-installer
+      display_name: "WorkBuddy 记忆回灌系统安装器"
+    - slug: knowledge-filing-assistant
+      display_name: "小中高知识点串联助手"
 
 notification:
   channel: session

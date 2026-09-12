@@ -27,12 +27,6 @@
 
 ## 检查Issues
 
-### Gitee
-
-```bash
-curl -s "https://gitee.com/api/v5/repos/{owner}/{repo}/issues?access_token={token}&state=open&sort=created&direction=desc&limit=20"
-```
-
 ### GitHub
 
 ```bash

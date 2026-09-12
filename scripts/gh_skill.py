@@ -229,31 +229,237 @@ def get_skill_md(owner, repo):
     return content, sha
 
 def parse_frontmatter(md):
-    m = re.match(r"^---\n(.*?)\n---", md, re.DOTALL)
+    """容忍常见 frontmatter 写法：标量、引号、行内列表、块列表（如 read_when:）。"""
+    m = re.match(r"^---\s*\n(.*?)\n---", md, re.DOTALL)
     if not m:
         return {}
     fm = {}
     cur = None
     for line in m.group(1).splitlines():
-        if line.startswith("  ") and cur:
-            fm[cur] += "\n" + line.strip()
-        elif ":" in line:
+        if not line.strip():
+            continue
+        if re.match(r"^\s+-\s+", line) and cur:
+            item = re.sub(r"^\s+-\s+", "", line).strip().strip('"').strip("'")
+            if isinstance(fm.get(cur), list):
+                fm[cur].append(item)
+            else:
+                fm[cur] = [item]
+            continue
+        if ":" in line:
             k, v = line.split(":", 1)
-            fm[k.strip()] = v.strip()
-            cur = k.strip()
+            k = k.strip()
+            v = v.strip().strip('"').strip("'")
+            if v == "":
+                fm[k] = []
+                cur = k
+            elif v.startswith("[") and v.endswith("]"):
+                inner = v[1:-1]
+                fm[k] = [x.strip().strip('"').strip("'") for x in inner.split(",") if x.strip()]
+                cur = k
+            else:
+                fm[k] = v
+                cur = k
+        elif cur and isinstance(fm.get(cur), str):
+            fm[cur] += " " + line.strip()
     return fm
 
-def ensure_topic(owner, repo, topic="agent-skills"):
+def frontmatter_text(fm):
+    """把 frontmatter 所有值拼成一段小写文本（供亮点扫描）。"""
+    parts = []
+    for v in fm.values():
+        if isinstance(v, list):
+            parts.append(" ".join(str(x) for x in v))
+        else:
+            parts.append(str(v))
+    return " ".join(parts).lower()
+
+def concept_in_text(concept, text):
+    """中英文概念匹配：中文按子串；英文按词边界（避免 age→manage 误命中）。"""
+    if not concept:
+        return False
+    if any(ord(c) > 127 for c in concept):
+        return concept.lower() in text
+    return re.search(r"\b" + re.escape(concept.lower()) + r"\b", text) is not None
+
+# ------------------------------------------------------------
+# 发布时按软件自身亮点自动设置 GitHub topics（提升可发现性）
+# 原则：关键词来自软件自己的 SKILL.md（description / 触发词），
+#       不是外部词库挑选。CONCEPT_TOPICS 只是把软件自有亮点
+#       （中英文皆可）翻译成合法 GitHub 英文 topic token 的映射层。
+# 若 SKILL.md frontmatter 显式写了 topics:，则直接采用（软件自己声明亮点）。
+# ------------------------------------------------------------
+CONCEPT_TOPICS = {
+    # 通用 / agent
+    "agent": "ai-agent", "智能体": "ai-agent", "agent-skills": "agent-skills",
+    "skill": "agent-skills", "技能": "agent-skills",
+    "llm": "llm", "大模型": "llm", "模型": "llm", "gpt": "llm",
+    "self-improving": "self-improving-agent", "自进化": "self-improving-agent",
+    "自优化": "self-improving-agent", "自改进": "self-improving-agent",
+    # 编程 / 代码
+    "python": "python", "py": "python",
+    "code": "code", "代码": "code",
+    "refactor": "refactoring", "重构": "refactoring",
+    "optimize": "code-optimization", "优化": "code-optimization",
+    "optimizer": "code-optimization", "code-review": "code-review",
+    "审查": "code-review", "code quality": "code-quality", "代码质量": "code-quality",
+    "cli": "cli-tool", "命令行": "cli-tool",
+    "ide": "ide-integration",
+    # 多模型 / 多智能体
+    "multi-model": "multi-model", "多模型": "multi-model",
+    "multi-agent": "multi-agent", "多智能体": "multi-agent", "多角色": "multi-agent",
+    "comparison": "comparison", "对比": "comparison", "benchmark": "benchmark",
+    # 提示词 / 写作
+    "prompt": "prompt-engineering", "提示词": "prompt-engineering",
+    "writing": "writing-assistant", "写作": "writing-assistant",
+    "novel": "novel-writing", "小说": "novel-writing",
+    "translate": "translation", "翻译": "translation",
+    "critique": "critique", "批判": "critique",
+    # 记忆 / 知识
+    "memory": "memory", "记忆": "memory", "long-term": "long-term-memory",
+    "knowledge": "knowledge-base", "知识库": "knowledge-base",
+    "knowledge-graph": "knowledge-graph", "知识图谱": "knowledge-graph",
+    "rag": "rag",
+    # 办公 / 协作
+    "office": "office-automation", "办公": "office-automation", "oa": "oa",
+    "automation": "automation", "自动化": "automation",
+    "collaboration": "collaboration", "协作": "collaboration", "团队": "collaboration",
+    "permission": "permission", "权限": "permission",
+    "notification": "notification", "通知": "notification",
+    "monitoring": "monitoring", "监控": "monitoring",
+    "meeting": "meeting", "会议": "meeting", "email": "email", "邮箱": "email",
+    # 文档 / 搜索
+    "documentation": "documentation", "文档": "documentation",
+    "search": "search", "搜索": "search", "web-scraping": "web-scraping", "爬虫": "web-scraping",
+    "research": "research", "研发": "research", "调研": "research",
+    # 金融 / 量化
+    "quant": "quant-trading", "量化": "quant-trading", "trading": "trading",
+    "backtest": "backtesting", "回测": "backtesting",
+    "investment": "investment", "投资": "investment", "finance": "finance", "理财": "finance",
+    "mortgage": "mortgage-calculator", "房贷": "mortgage-calculator",
+    # 多模态
+    "face": "face-recognition", "人脸": "face-recognition",
+    "age": "age-estimation", "年龄": "age-estimation",
+    "whisper": "speech-to-text", "speech": "speech-to-text", "转写": "speech-to-text",
+    "image": "image-generation", "图像": "image-generation", "video": "video-generation",
+    # 发布 / 反馈
+    "publish": "publish", "发布": "publish",
+    "feedback": "feedback", "反馈": "feedback",
+    "continuous-improvement": "continuous-improvement", "持续优": "continuous-improvement",
+    "plugin": "plugin", "插件": "plugin", "mcp": "mcp",
+}
+
+def derive_topics_from_skill(md):
+    """从 SKILL.md 亮点推导 GitHub topics。
+    - frontmatter 显式写了 topics: → 直接采用（软件自己声明亮点）
+    - 否则扫描亮点区（名称/简介/displayName/触发词 read_when + 正文前段），
+      按 CONCEPT_TOPICS 中英文映射（中文子串、英文词边界）
+    - 永远保留 agent-skills（gh skill search 发现依赖）"""
+    fm = parse_frontmatter(md) if md else {}
+    explicit = fm.get("topics")
+    if isinstance(explicit, str):
+        explicit = [t.strip() for t in explicit.split(",") if t.strip()]
+    if isinstance(explicit, list) and explicit:
+        topics = [str(t).strip().lower() for t in explicit]
+    else:
+        text = frontmatter_text(fm)
+        if md:
+            text += " " + md[:2000].lower()
+        topics = [topic for concept, topic in CONCEPT_TOPICS.items()
+                  if concept_in_text(concept, text)]
+    if "agent-skills" not in topics:
+        topics.insert(0, "agent-skills")
+    seen, uniq = set(), []
+    for t in topics:
+        t = t.strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return uniq[:20]
+
+def get_existing_topics(owner, repo):
+    """GET 仓库现有 topics（用于合并，避免覆盖）。
+
+    返回 (status, topics)：
+      ("ok",    [...])  → 成功读到现有 topics
+      ("empty", [])     → 仓库无 topics（GitHub 对空 topics 返回 404，属正常）
+      ("error", None)   → 其他错误（如 403/500/网络）→ 调用方应拒绝写入以防误覆盖
+    """
     r = run(["gh", "api", f"repos/{owner}/{repo}/topics"], check=False)
     if r.returncode != 0:
-        print(f"  ⚠️  无法读取 topic，跳过检查")
+        # GitHub 对「无 topics」的仓库用 404 表示，等价于 empty
+        if "404" in (r.stderr or "") or "Not Found" in (r.stderr or ""):
+            return ("empty", [])
+        return ("error", None)
+    try:
+        names = json.loads(r.stdout).get("names", []) or []
+        return ("ok", names)
+    except Exception:
+        return ("error", None)
+
+def apply_topics(owner, repo, md=None, skill_dir=None, dry_run=False):
+    """发布时按软件自身亮点设置 GitHub topics。
+
+    铁律：只动本仓；绝不覆盖（删除）已有 topics。
+    - 能从 SKILL.md 推导 → 推导 topics（优先本地 --skill-dir，其次 GitHub）
+    - 不能推导（md=None）→ 仅确保 agent-skills 存在，其余 topics 全部保留
+    - 最终 topics = 推导集 ∪ 已有集（去重，封顶 20），永远保留 agent-skills
+    - 取现有 topics 失败时（非 404 错误）→ 拒绝写入，宁可不动也不误覆盖
+    """
+    # 1. 取 SKILL.md（优先本地 skill-dir，其次 GitHub）
+    if md is None and skill_dir:
+        p = os.path.join(skill_dir, "SKILL.md")
+        if os.path.isfile(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    md = f.read()
+            except Exception:
+                md = None
+    if md is None:
+        md, _ = get_skill_md(owner, repo)
+
+    derived = derive_topics_from_skill(md) if md else []
+
+    # 2. 取现有 topics（合并用，避免覆盖）
+    status, existing = get_existing_topics(owner, repo)
+    if status == "error":
+        print(f"  ⚠️  读取 {repo} 现有 topics 失败，为遵守「不覆盖」铁律，本次跳过 topics 写入")
         return
-    topics = json.loads(r.stdout).get("names", [])
-    if topic in topics:
-        print(f"  ✅ topic '{topic}' 已存在")
+    if existing is None:
+        existing = []
+
+    # 3. 合并：推导 ∪ 已有 ∪ agent-skills，去重，封顶 20
+    merged, seen = [], set()
+    for t in derived + existing + ["agent-skills"]:
+        t = str(t).strip().lower()
+        if t and t not in seen:
+            seen.add(t)
+            merged.append(t)
+    merged = merged[:20]
+    if not merged:
+        merged = ["agent-skills"]
+
+    if dry_run:
+        print(f"  [dry-run] 将据软件亮点合并设置 {len(merged)} 个 topics: {', '.join(merged)}")
+        if md is None:
+            print(f"  [dry-run] ℹ️  无法读取 SKILL.md（保留现有 topics，仅确保 agent-skills）")
         return
-    run(["gh", "repo", "edit", f"{owner}/{repo}", "--add-topic", topic])
-    print(f"  ✅ 已添加 topic '{topic}'")
+
+    body = json.dumps({"names": merged})
+    tmp = os.path.join(RESkill_DIR, "settings", f".topics_{repo}.json")
+    with open(tmp, "w") as f:
+        f.write(body)
+    r = run(["gh", "api", "--method", "PUT", f"repos/{owner}/{repo}/topics",
+             "--input", tmp], check=False)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
+    if r.returncode == 0:
+        print(f"  ✅ 已据软件亮点合并设置 {len(merged)} 个 topics: {', '.join(merged)}")
+        if md is None:
+            print(f"  ℹ️  未读取到 SKILL.md，已保留 {len(existing)} 个原有 topics（仅确保 agent-skills）")
+    else:
+        print(f"  ⚠️  设置 topics 失败: {r.stderr[:160]}")
 
 def ensure_release(owner, repo, tag, dry_run=False):
     r = subprocess.run(["gh", "release", "view", tag, "--repo", f"{owner}/{repo}"],
@@ -318,9 +524,10 @@ def cmd_create(args):
     print("\n📦 创建 release...")
     ensure_release(owner, repo, tag, dry_run=args.dry_run)
 
-    # 加 topic（非 dry-run）
+    # 加专属关键词 topics（非 dry-run）
     if not args.dry_run:
-        ensure_topic(owner, repo)
+        apply_topics(owner, repo, skill_dir=getattr(args, "skill_dir", None),
+                     dry_run=args.dry_run)
 
     write_snapshot(owner, repo, tag, "create", args.dry_run, findings)
     print(f"\n✅ 完成 — {owner}/{repo} @ {tag}")
@@ -358,9 +565,11 @@ def cmd_publish(args):
         else:
             print(f"  ✅ name={fm.get('name')} description={len(fm.get('description',''))}字")
 
-    # 加 topic + 创建 release
-    print("\n🏷️  添加 topic...")
-    ensure_topic(owner, repo)
+    # 加专属关键词 topics（按软件自身亮点）+ 创建 release
+    print("\n🏷️  按软件亮点添加关键词 topics...")
+    apply_topics(owner, repo, md=md,
+                 skill_dir=getattr(args, "skill_dir", None),
+                 dry_run=args.dry_run)
 
     print(f"\n🚀 创建 release {tag}...")
     ensure_release(owner, repo, tag, dry_run=args.dry_run)
@@ -480,12 +689,14 @@ def main():
     p_create = sub.add_parser("create", help="创建仓库 + topic + release")
     p_create.add_argument("repo", help="owner/name")
     p_create.add_argument("--tag", required=True, help="semver tag")
+    p_create.add_argument("--skill-dir", help="本地 skill 目录（含 SKILL.md），用于读取软件自身亮点推导 topics")
     p_create.add_argument("--dry-run", action="store_true")
 
     # publish
     p_pub = sub.add_parser("publish", help="发布：加 topic + 创建 release")
     p_pub.add_argument("repo", help="owner/name")
     p_pub.add_argument("--tag", required=True, help="semver tag")
+    p_pub.add_argument("--skill-dir", help="本地 skill 目录（含 SKILL.md），用于读取软件自身亮点推导 topics")
     p_pub.add_argument("--dry-run", action="store_true")
     p_pub.add_argument("--skip-scan", action="store_true",
                        help="跳过凭据扫描（需管理员授权）")

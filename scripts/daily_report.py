@@ -4,9 +4,9 @@
 reskill — 每日检查统一日报生成器
 =================================
 一次运行，拉取所有已监控平台的核心指标：
-  ⭐ stars      （SkillHub / GitHub / Gitee 三平台）
+  ⭐ stars      （SkillHub / GitHub 双平台）
   📥 downloads  （仅 SkillHub）
-  🐛 open issues（GitHub / Gitee）
+  🐛 open issues（GitHub）
 
 行为：
   • 首次运行（无 settings/daily_state.json）→ 输出【全量】基线。
@@ -17,8 +17,10 @@ reskill — 每日检查统一日报生成器
 本脚本不做任何外部推送（微信 / 飞书 / 钉钉等）。
 
 依赖：仅 Python 标准库；GitHub 数据走 `gh` CLI（需已登录），
-Gitee / SkillHub 走官方 API（token 从 settings/reskill_config.yaml
+SkillHub 走官方 API（token 从 settings/reskill_config.yaml
 与 ~/.skillhub/credentials.json 读取，绝不打印）。
+
+Gitee 监控已于 2026-09-11 移除。
 """
 import json
 import os
@@ -170,31 +172,6 @@ def fetch_github(owner, repos):
     return out
 
 
-def fetch_gitee(owner, token, repos):
-    out = {}
-    for name in repos:
-        stars = None
-        issues = None
-        try:
-            u = f"https://gitee.com/api/v5/repos/{owner}/{name}?access_token={token}"
-            with urllib.request.urlopen(u, timeout=20) as r:
-                d = json.load(r)
-            stars = d.get("stargazers_count")
-        except Exception:
-            stars = None
-        try:
-            u2 = (f"https://gitee.com/api/v5/repos/{owner}/{name}/issues"
-                  f"?state=open&access_token={token}&per_page=50")
-            with urllib.request.urlopen(u2, timeout=20) as r:
-                arr = json.load(r)
-            issues = [{"id": str(i.get("number") or i.get("id")),
-                       "title": i.get("title") or ""} for i in arr]
-        except Exception:
-            issues = None
-        out[name] = {"stars": stars, "issues": issues}
-    return out
-
-
 # ---------------------------------------------------------------------------
 # 4. 状态（基线）读写
 # ---------------------------------------------------------------------------
@@ -212,7 +189,7 @@ def save_state(state):
               ensure_ascii=False, indent=2)
 
 
-def build_serializable(skillhub_raw, github_raw, gitee_raw):
+def build_serializable(skillhub_raw, github_raw):
     return {
         "date": TODAY,
         "skillhub": {slug: {"stars": d["stars"], "downloads": d["downloads"]}
@@ -220,9 +197,6 @@ def build_serializable(skillhub_raw, github_raw, gitee_raw):
         "github": {name: {"stars": g["stars"],
                           "issue_ids": [i["id"] for i in (g["issues"] or [])]}
                    for name, g in github_raw.items()},
-        "gitee": {name: {"stars": g["stars"],
-                         "issue_ids": [i["id"] for i in (g["issues"] or [])]}
-                  for name, g in gitee_raw.items()},
     }
 
 
@@ -233,10 +207,9 @@ def _fmt(v):
     return "❓" if v is None else str(v)
 
 
-def compose_full(cfg, skillhub_raw, github_raw, gitee_raw):
+def compose_full(cfg, skillhub_raw, github_raw):
     lines = [f"📊 reskill 每日检查 — {TODAY}（首次全量基线）", ""]
     gh_owner = cfg.get("github", {}).get("owner", "?")
-    ge_owner = cfg.get("repo", {}).get("owner", "?")
 
     lines.append(f"【SkillHub · {len(skillhub_raw)} 个】⭐stars  📥downloads")
     for slug, d in skillhub_raw.items():
@@ -253,19 +226,11 @@ def compose_full(cfg, skillhub_raw, github_raw, gitee_raw):
         lines.append("  （无数据）")
 
     lines.append("")
-    lines.append(f"【Gitee · {len(gitee_raw)} 个】（{ge_owner}）⭐stars  🐛open issues")
-    for name, g in gitee_raw.items():
-        cnt = len(g["issues"]) if g["issues"] is not None else None
-        lines.append(f"  {name:<34} ⭐{_fmt(g['stars']):>5}  🐛{_fmt(cnt):>4}")
-    if not gitee_raw:
-        lines.append("  （无数据）")
-
-    lines.append("")
     lines.append("✅ 已建立基线，明日将仅显示增量变化。")
     return "\n".join(lines)
 
 
-def compose_incremental(prev, cfg, skillhub_raw, github_raw, gitee_raw):
+def compose_incremental(prev, cfg, skillhub_raw, github_raw):
     changes = []  # (platform_label, name, detail_lines)
 
     def diff_section(plat_label, prev_map, cur_raw, has_downloads=False):
@@ -314,10 +279,8 @@ def compose_incremental(prev, cfg, skillhub_raw, github_raw, gitee_raw):
     diff_section("SkillHub", prev.get("skillhub", {}), skillhub_raw, has_downloads=True)
     diff_section(f"GitHub/{cfg.get('github',{}).get('owner','?')}",
                  prev.get("github", {}), github_raw)
-    diff_section(f"Gitee/{cfg.get('repo',{}).get('owner','?')}",
-                 prev.get("gitee", {}), gitee_raw)
 
-    total_cur = (len(skillhub_raw) + len(github_raw) + len(gitee_raw))
+    total_cur = (len(skillhub_raw) + len(github_raw))
     if not changes:
         return (f"📊 reskill 每日检查 — {TODAY}（增量 · 较 {prev.get('date','?')}）\n\n"
                 f"✅ 今日无变化（{total_cur} 个监控项的 stars / 下载量 / issues 均与基线一致）。")
@@ -338,7 +301,7 @@ def main():
     if "--test" in sys.argv:
         cfg = parse_config(CONFIG)
         # 脱敏：不回显真实 token
-        for sec in ("github", "repo"):
+        for sec in ("github",):
             if sec in cfg and "token" in cfg[sec]:
                 t = cfg[sec]["token"]
                 cfg[sec]["token"] = (t[:4] + "…" + t[-4:]) if t and len(t) > 8 else "***"
@@ -349,9 +312,6 @@ def main():
     sh_token, sh_handle = load_skillhub_creds()
     gh_owner = cfg.get("github", {}).get("owner")
     gh_repos = [r.get("name") for r in cfg.get("github", {}).get("repos", []) if r.get("name")]
-    ge_owner = cfg.get("repo", {}).get("owner")
-    ge_token = cfg.get("repo", {}).get("token")
-    ge_repos = [r.get("name") for r in cfg.get("repo", {}).get("repos", []) if r.get("name")]
     sh_slugs = [s.get("slug") for s in cfg.get("skillhub", {}).get("skills", []) if s.get("slug")]
 
     # 抓取（各自容错）
@@ -360,15 +320,14 @@ def main():
     skillhub_raw = {s: skillhub_raw[s] for s in sh_slugs if s in skillhub_raw}
 
     github_raw = fetch_github(gh_owner, gh_repos) if gh_owner and gh_repos else {}
-    gitee_raw = fetch_gitee(ge_owner, ge_token, ge_repos) if ge_owner and ge_token and ge_repos else {}
 
     prev = load_state()
     if prev is None:
-        report = compose_full(cfg, skillhub_raw, github_raw, gitee_raw)
+        report = compose_full(cfg, skillhub_raw, github_raw)
     else:
-        report = compose_incremental(prev, cfg, skillhub_raw, github_raw, gitee_raw)
+        report = compose_incremental(prev, cfg, skillhub_raw, github_raw)
 
-    save_state(build_serializable(skillhub_raw, github_raw, gitee_raw))
+    save_state(build_serializable(skillhub_raw, github_raw))
     print(report)
 
 

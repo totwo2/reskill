@@ -72,16 +72,26 @@ name: 智能py脚本        # 中文不允许（只允许 a-z, 0-9, -）
 
 ### 2.3 description 字段规则
 ```yaml
-# ✅ 好的示例
+# ❌ 差示例 A（开发者视角：只说机制，用户读不出"对我有什么用"）
 description: |
-  Skill发布、用户反馈收集与持续优化系统。发布skill到Gitee/GitHub/SkillHub，
+  Skill发布、用户反馈收集与持续优化系统。发布skill到GitHub/SkillHub，
   自动同步名下已发布skill列表，定期检查用户意见，提取有效反馈，
   提醒作者决策，自动优化skill。
-  触发词：发布skill、检查反馈、用户意见、优化skill、更新skill、配置通知、下载量、下载趋势、同步skill列表、查名下skill
 
-# ❌ 差的示例
-description: 发布skill的工具。  # 太短，缺少触发词
+# ❌ 差示例 B（太短，无触发词，无收益）
+description: 发布skill的工具。
+
+# ✅ 好示例（用户视角：先说解决什么问题，再列触发词）
+description: |
+  发 skill 之前先过质量闸门：形态适配（GitHub 项目 / SkillHub installer）、
+  简介与标签、README 用户视角、SKILL.md 大模型视角，四道不过不发。
+  过闸后发布到 GitHub + SkillHub 双平台，追踪下载量趋势、收集 issue 反馈、通知你决策。
+  触发词：发布skill、推到github、推到skillhub、检查反馈、用户意见、优化skill、
+  下载量、下载趋势、同步skill列表、查名下skill、配置通知
 ```
+
+**判定口诀**：拉一个不懂这项目的人，读一遍 description，问他"这能帮你什么"。
+答不上来 = 差示例 A；能答上来 = 好示例。
 
 ### 2.4 正文内容
 - Markdown 格式

@@ -148,8 +148,8 @@ git status  # 确认 working tree 干净
 
 ## 注意事项
 
-1. **不要执行 `skillhub upgrade` 命令**——它会按本机 skill 的 config.json 批量升级所有 skill，但本机 reskill 已经从 Gitee 改成 totwo2 GitHub 源，不在 skillhub CLI 的升级路径里
-2. **不要 git pull origin**——本机 origin 是 Gitee <your-gitee-account>/reskill，totwo2 的版本单独 fetch
+1. **不要执行 `skillhub upgrade` 命令**——它会按本机 skill 的 config.json 批量升级所有 skill，本机源是 totwo2 GitHub，不在 skillhub CLI 的升级路径里
+2. **origin 已是 GitHub**（`https://github.com/totwo2/reskill.git`）——Gitee 已于 2026-09-11 弃用，不要再去 `gitee.com/<your-gitee-account>/*` 拉代码
 3. **每次升级前确认老高是否要求同步源**——如果只升级本机，跳过 4.6 推送
 4. **settings/ 永远不能覆盖**——用户的真实 token 和监控基线是私有的
 5. **凭据扫描要在 3.2 跑一次**——即时不打算发布，验证源是否带脏数据

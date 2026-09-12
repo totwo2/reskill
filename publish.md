@@ -1,6 +1,7 @@
 # publish.md — Skill发布流程
 
-> Main读这个文件。把skill推到Gitee/GitHub。
+> Main读这个文件。**发布前先过 `publish-quality.md` 质量闸门**，再按本文推到 GitHub / SkillHub。
+> 代码能跑 ≠ 发布物能看。简介、标签、README、SKILL.md 不合格，不许发。
 
 ---
 
@@ -10,7 +11,7 @@
 
 | 角色 | 谁的数据 | 是否扫描 | 在哪里 |
 |---|---|---|---|
-| **开发者**（写 reskill、上传 GitHub/Gitee 仓库的人） | reskill_config.yaml.example、SKILL.md、scripts/*、download_history.yaml 里的示例值 | **必扫** | 即将 commit / push 的文件 |
+| **开发者**（写 reskill、上传 GitHub 仓库的人） | reskill_config.yaml.example、SKILL.md、scripts/*、download_history.yaml 里的示例值 | **必扫** | 即将 commit / push 的文件 |
 | **最终用户**（下载 reskill 跑监控的人） | settings/reskill_config.yaml（真实 token）、settings/download_history.yaml（自己的下载快照）、settings/feedback_report.md、settings/my_skills_snapshot.yaml | **绝不扫描** | 用户的本地 settings/ 目录 |
 
 **边界划分原则：**
@@ -37,19 +38,24 @@
 
 ## ☠️ 发布前硬性红线（每次必做，不可跳过）
 
-**任何 git push / skillhub publish 之前，必须先跑凭据扫描：**
+**任何 git push / skillhub publish 之前，必须先跑综合检查闸门（凭据 + 个人痕迹 + 结构）：**
 
 ```bash
-# git push 前（尊重 .gitignore，只扫将入库的文件——这是日常使用方式）
-bash scripts/preflight_secret_scan.sh .
+# 总闸门（推荐，覆盖全部）：凭据扫描 + 个人痕迹词库 + 结构完整性
+bash scripts/preflight_publish_check.sh .
 
-# skillhub publish 前（打包不看 .gitignore，扫全部文件——临时使用）
-bash scripts/preflight_secret_scan.sh . --all
+# 仅凭据扫描（总闸门内部已包含，单独跑用于快速排障）
+bash scripts/preflight_secret_scan.sh .
 ```
 
-- 退出码 **0** = 通过，才能发布。
-- 退出码 **1** = 命中凭据，**立即中止发布**，先把凭据移出仓库（改用 `*.example.*` 脱敏 + `.gitignore`）再重扫。
-- **扫描不命中用户 settings/ 下的真实 token**——见上面"凭据扫描：边界与责任"章节
+- **退出码 0 = 通过，才能发布。**
+- **退出码 1 = 命中，立即中止发布**，修复命中项后重扫。
+- 综合检查覆盖（2026-08-25 教训固化）：
+  1. 凭据扫描（复用 preflight_secret_scan.sh 全部模式）
+  2. 个人痕迹词库：第三方借鉴（Headroom/JiangGong/vLLM/…）、平台品牌（workbuddy）、实验语境（窗口一/实验 v4）、旧业务词（zhangsan/财务部/公文/审批…）、个人绝对路径、剥离/边界叙事（"已剥离"/"不含（边界说明）"）
+  3. 结构完整性：SKILL.md frontmatter、README 双语、MANIFEST 引用文件存在、pytest 配置有效、无 .venv/__pycache__ 入库
+
+**教训（2026-08-25）：** 仅凭据扫描不够——发布后才发现 README 非双语、含边界说明、代码带旧业务词/实验语境/品牌残留，被迫 force-push 重写历史。综合闸门把这些从"靠人审查"变成"机制拦截"。
 
 历史教训（2026-06-12 `50c6124` 提交把 gitee token 明文推入公开仓库，汄露约一个月）：
 1. 仓库从建立起无 `.gitignore` → 无机制阻止敏感文件入库
@@ -114,51 +120,19 @@ rmdir /tmp/reskill_publish_exclude
 
 ---
 
-## 平台选择
+## 平台与形态（定形态是第一步）
 
-| 平台 | 优势 | 劣势 |
-|------|------|------|
-| Gitee | 国内稳定，速度快 | 国际用户少 |
-| GitHub | 全球通用，skillhub支持 | 国内不稳定 |
+> **先读 `publish-quality.md`。形态错了，后面 README / 元数据全白做。**
 
-**建议：** 国内用户用Gitee，国际用户用GitHub。两个都推也行。
+| 平台 | 发布形态 | 入口文件 | 版本写法 | 受众语言 |
+|---|---|---|---|---|
+| **GitHub** | 普通项目仓库（什么都能发） | `README.md` | `v1.2.0`（带 v） | 英文优先 |
+| **SkillHub** | **skill installer 形态（只能发 skill）** | `SKILL.md` | `1.2.0`（不带 v） | 中文优先 |
 
----
+- 把 GitHub 普通项目直接推 SkillHub → 无 `SKILL.md` / 缺 `slug` → 发布被拒或装不上
+- 把 SkillHub 的 skill 原样推 GitHub → 主页是"技能说明"不是"项目主页" → 没人停留
 
-## Gitee发布步骤
-
-### 1. 创建仓库
-
-```bash
-curl -s -X POST "https://gitee.com/api/v5/user/repos" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "access_token": "{token}",
-    "name": "{仓库名}",
-    "description": "{描述}",
-    "private": false,
-    "auto_init": false
-  }'
-```
-
-### 2. 推代码
-
-```bash
-cd {skill目录}
-git init
-git remote add origin https://{用户名}:{token}@gitee.com/{用户名}/{仓库名}.git
-git add -A
-git commit -m "v1.0: 初始发布"
-git push -u origin master
-```
-
-### 3. 版本更新
-
-```bash
-git add -A
-git commit -m "v1.1: {更新内容}"
-git push
-```
+**Gitee 已于 2026-09-11 从本项目移除，不再是发布目标。**
 
 ---
 
@@ -231,6 +205,11 @@ git push -u origin master
 - ⚠️ **SkillHub 不允许同版本重发**（报 `slug 冲突: 版本 X 已存在，请使用新的版本号发布`）。故"同版本改成中文"走不通，只能两平台同升一个新版本号来满足"sh 中文 + 版本一致"。
 
 ---
+
+### skillhub publish 已知限制（2026-09-06 no-bb 发布实测）
+- **SKILL.md frontmatter 必须有 `slug` 字段**（与 name 一致即可），缺失报 `SKILL.md 缺少 slug`
+- **--version 必须三段 SemVer**（1.0.0 ✓，1.0 ✗ 报 `version 不是合法 SemVer`）——与 gh 侧 vX.Y.Z 数字对齐但 skillhub 侧永不带 v
+- 发布成功返回 `✓ Published: skillId=<id>`，把 id 记入 reskill_config.yaml 的 skillhub.repos/skills 段做监控
 
 ## 版本号规范
 
@@ -323,7 +302,9 @@ gh skill update <owner>/<repo>
 - [ ] name 与目录名相同
 - [ ] allowed-tools 是字符串（不是数组）
 - [ ] 仓库 description 已填
-- [ ] topic `agent-skills` 已加
+- [ ] **About topics 已加（所有 gh 仓库通用，老高 2026-09-06 定）**：skill 仓库加 `agent-skills`；普通软件仓库 15~20 个 topic，**两组词都要覆盖**：①技术分类词（ai/llm/proxy/python/…）②效果作用词（项目省/快/优化的维度，如 token-optimization/latency/cost-optimization/test-time-compute——搜作用词的人才是被痛点扎到的目标用户）；命令：
+  `gh api repos/<owner>/<repo>/topics -X PUT --input - <<< '{"names":["t1","t2"]}'`
+- [ ] topic `agent-skills` 已加（skill 仓库）
 - [ ] LICENSE 文件存在（MIT）
 - [ ] 每个版本有对应 tag + release
 - [ ] 已跑 `gh skill publish --dry-run` 看到 ✅
@@ -331,12 +312,36 @@ gh skill update <owner>/<repo>
 
 ---
 
-## 发布检查清单
+## 发布总闸门（五道，顺序执行；任一不过 = 不许发）
 
-- [ ] **已跑 `bash scripts/preflight_secret_scan.sh .` 且退出码 0**（硬性前置）
-- [ ] SKILL.md 有 name 和 description
-- [ ] 所有模块文件存在
-- [ ] README.md 写清楚使用方法
-- [ ] 没有敏感信息（token、密码、个人路径）
-- [ ] 版本号已更新
-- [ ] **发布后已跑 `python3 scripts/fetch_my_skills.py`**（自动同步监控清单）
+### 闸门 0 · 发布物质量（最容易翻车的一道，详见 publish-quality.md）
+
+- [ ] **形态选对**：GitHub = 普通项目（README 入口）；SkillHub = skill installer（SKILL.md 入口）
+- [ ] **双平台同名可对应**（不许 gh 一个名、sh 一个拼音名）
+- [ ] **description 是用户视角**：说收益，不说实现机制；SkillHub 侧必须带触发词
+- [ ] **topics 已填且两组词齐全**（技术分类词 + 效果作用词），GitHub 侧 15~20 个
+- [ ] **README 过 3 秒测试**：钩子 → 数字 → 30 秒上手 → 装完验证（原理放后面）
+- [ ] **SKILL.md 是执行手册**：description 带触发词、命令可复制、用法在前 1/3、有适用边界、无开发日志
+- [ ] **双维度打分**：用户视角 ≥3 分 **且** 大模型视角 ≥3 分
+
+### 闸门 1 · 凭据与个人痕迹
+
+- [ ] 已跑 `bash scripts/preflight_publish_check.sh .` 且退出码 0
+- [ ] 无 token / 个人绝对路径 / 第三方品牌残留
+
+### 闸门 2 · 结构完整性
+
+- [ ] SKILL.md frontmatter 齐全（name / slug / displayName / description）
+- [ ] README 存在（GitHub 侧双语）
+- [ ] MANIFEST 引用的文件都存在
+- [ ] 无 .venv / __pycache__ 入库
+
+### 闸门 3 · 版本
+
+- [ ] gh 与 sh 版本号数字一致（gh 带 `v`，sh 不带）
+- [ ] SkillHub 同版本不可重发，必须升号
+
+### 闸门 4 · 发布后
+
+- [ ] 已跑 `python3 scripts/fetch_my_skills.py` 同步监控清单
+- [ ] 输出契约三行：版本号 / 平台链接 / 同步状态 → **收口，不再输出改进建议**

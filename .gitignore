@@ -28,3 +28,6 @@ settings/daily_state.json
 
 # Author runtime publish logs (instance data, not template content)
 settings/release_history/
+
+# Publish pipeline staging (artifacts, verdicts, ledger — instance data)
+.publish-staging/
