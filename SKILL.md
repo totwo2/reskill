@@ -24,6 +24,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | 用户说 | 动作 |
 |--------|------|
 | "发布skill" / "推到github" / "推到skillhub" | **publish-code-audit.md 审代码** → publish-quality.md 质量闸门 → publish.md 发布 |
+| "发版" / "走完整发布流程" / "全自动发布" | **scripts/publish_flow.py**（状态机）+ **scripts/local_executor.py**（真实执行器）→ N0→N7 无人值守 |
 | "审代码" / "这代码真的实现了吗" / "有没有超纲" | **publish-code-audit.md** → 覆盖表 / 超纲表 / 幻觉表 |
 | "检查发布物质量" / "这 README 行不行" | publish-quality.md → 双维度打分 |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查 GitHub issues + SkillHub 数据 |
@@ -68,6 +69,10 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | 发布 | publish.md | 推送到 GitHub / SkillHub，版本管理 |
 | 反馈 | feedback-collector.md | 检查issues，提取有效反馈，提醒作者 |
 | 通知 | notification.md | 多渠道消息通知（微信/飞书/钉钉/Telegram） |
+| **发布状态机** | **scripts/publish_flow.py** | **无人值守：持状态 / 管推进 / 记判决账本；两个终态 released / deferred** |
+| **本机真实执行器** | **scripts/local_executor.py** | **机器节点真跑脚本；语义节点读「判定收件箱」，收不到就不放行** |
+| **客观代理指标** | **scripts/quality_metrics.py** | **给 README / SKILL.md 打客观分，判定者想松口时顶住它** |
+| **形态判定** | **scripts/detect_publish_form.sh** | **N0：skill / installer / github-project 三路判定** |
 | 下载量追踪 | scripts/check_downloads.py | SkillHub下载量趋势快照+增量提醒 |
 | 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
 | 发布前扫描 | scripts/preflight_publish_check.sh | 凭据 + 个人痕迹 + 结构，综合闸门 |

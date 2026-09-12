@@ -67,7 +67,21 @@ PATTERNS=(
   '不含（边界说明）' '不需要：Web 服务' '已剥离' '全不要'
 )
 
+# 性能：40+ 个词条逐条 grep，子进程启动开销会拖到分钟级。
+# 做法 —— 先合并成一次 grep 判空（零命中直接跳过，这是绝大多数文件），
+# 只有确有命中的文件才走逐条精确匹配。判定语义不变，只是省掉无用调用。
+PATFILE="$(mktemp)"
+trap 'rm -f "$PATFILE"' EXIT
+printf '%s\n' "${PATTERNS[@]}" > "$PATFILE"
+
+scanned=0; skipped=0
 for f in $FILES; do
+  scanned=$((scanned+1))
+  # 快速路径：合并 pattern 一次判空（grep -f 即多模式 OR）
+  if ! grep -qiEf "$PATFILE" "$f" 2>/dev/null; then
+    skipped=$((skipped+1)); continue
+  fi
+  # 慢速路径：确有命中的文件，逐条精确报出是哪个词条
   for p in "${PATTERNS[@]}"; do
     if grep -niE "$p" "$f" >/dev/null 2>&1; then
       hit "$p 命中: $f"
@@ -75,6 +89,7 @@ for f in $FILES; do
     fi
   done
 done
+echo "  （扫描 $scanned 个文件；快速路径跳过 $skipped 个）"
 
 # ============================================================
 # 3. 结构完整性

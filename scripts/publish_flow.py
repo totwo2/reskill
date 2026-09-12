@@ -49,6 +49,8 @@ LEDGER_FILE = "ledger.jsonl"
 
 # ---------------------------------------------------------------- 节点表
 # need      : 该节点必须落地的产物（None = 无文件产物，只看判定）
+# need_at   : 产物落在哪 —— "staging"（默认，暂存区）或 "project"（项目根，
+#             发布物本来就该覆盖项目里的同名文件，N3 硬闸门查的也是项目根）
 # min_score : 分数下限，None = 只判 pass/fail
 # judge     : 该节点的判定者身份（署名用）
 # good      : 质量卡的「合格样本」——这一步的好长什么样
@@ -64,7 +66,8 @@ NODES = [
         "good": "每条数字都有出处与日期，无来源不明的数据",
     },
     {
-        "id": "N2", "name": "写发布物", "need": "README.md", "min_score": 3,
+        "id": "N2", "name": "写发布物", "need": "README.md",
+        "need_at": "project", "min_score": 3,
         "judge": "quality",
         "good": "前 30 行让一个陌生人明白装了能得到什么",
     },
@@ -120,6 +123,19 @@ def ledger_path(project):
     return os.path.join(staging_dir(project), LEDGER_FILE)
 
 
+def artifact_path(project, node):
+    """该节点的产物应当落在哪。
+
+    staging（默认）——暂存区，中间产物（form.json / fact-sheet.md）
+    project       ——项目根，发布物本身（README.md），N3 硬闸门查的就是这里
+    """
+    if not node["need"]:
+        return None
+    base = os.path.abspath(project) if node.get("need_at") == "project" \
+        else staging_dir(project)
+    return os.path.join(base, node["need"])
+
+
 def load_state(project):
     p = state_path(project)
     if not os.path.exists(p):
@@ -168,6 +184,11 @@ def _apply_verdict(project, st, node, passed, score, judge, reason, artifact):
     nid = node["id"]
     attempt = st["attempts"].get(nid, 0) + 1
 
+    art = artifact
+    if not art:
+        ap = artifact_path(project, node)
+        art = os.path.relpath(ap, os.path.abspath(project)) if ap else node["need"]
+
     row = {
         "ts": now(),
         "node": nid,
@@ -178,7 +199,7 @@ def _apply_verdict(project, st, node, passed, score, judge, reason, artifact):
         "min_score": node["min_score"],
         "judge": judge,
         "reason": reason,
-        "artifact": artifact or node["need"],
+        "artifact": art,
     }
     append_ledger(project, row)
 
@@ -203,7 +224,8 @@ def _node_card(st):
         "name": node["name"],
         "attempt_next": st["attempts"].get(node["id"], 0) + 1,
         "max_rounds": MAX_ROUNDS,
-        "artifact_required": node["need"],
+        "artifact_required": artifact_path(st["project"], node),
+        "artifact_at": node.get("need_at", "staging"),
         "min_score": node["min_score"],
         "judge": node["judge"],
         "quality_card": {"good_looks_like": node["good"]},
@@ -289,7 +311,7 @@ def _run_external(project, node, attempt, cmd):
     """调外部执行器（真实执行器的接入点）。
 
     约定——环境变量传入上下文：
-        PFLOW_NODE / PFLOW_STAGING / PFLOW_ATTEMPT / PFLOW_NEED / PFLOW_MIN_SCORE
+        PFLOW_NODE / PFLOW_PROJECT / PFLOW_STAGING / PFLOW_ATTEMPT / PFLOW_NEED / PFLOW_MIN_SCORE
     约定——stdout 最后一行 JSON 回抛判定：
         {"verdict": "pass|fail", "score": 0-5|null, "reason": "可验证的判据"}
     退出码非 0，或没给出 JSON → 一律判 fail（默认安全位）。
@@ -297,6 +319,7 @@ def _run_external(project, node, attempt, cmd):
     env = dict(os.environ)
     env.update({
         "PFLOW_NODE": node["id"],
+        "PFLOW_PROJECT": os.path.abspath(project),
         "PFLOW_STAGING": staging_dir(project),
         "PFLOW_ATTEMPT": str(attempt),
         "PFLOW_NEED": node["need"] or "",
@@ -353,11 +376,11 @@ def cmd_run(args):
             passed, score, reason = _run_external(
                 st["project"], node, attempt, args.exec_cmd)
         else:
-            sd = staging_dir(st["project"])
-            if node["need"]:
-                ok = os.path.exists(os.path.join(sd, node["need"]))
-                reason = ("产物存在：%s" % node["need"]) if ok \
-                    else ("缺产物：%s" % node["need"])
+            ap = artifact_path(st["project"], node)
+            if ap:
+                ok = os.path.exists(ap)
+                shown = os.path.relpath(ap, os.path.abspath(st["project"]))
+                reason = ("产物存在：%s" % shown) if ok else ("缺产物：%s" % shown)
             else:
                 ok = True
                 reason = "无文件产物，占位执行器直接放行"
@@ -370,7 +393,7 @@ def cmd_run(args):
                     reason, score, node["min_score"])
 
         row = _apply_verdict(st["project"], st, node, passed, score,
-                             node["judge"], reason, node["need"])
+                             node["judge"], reason, None)
         trace.append({"node": node["id"], "verdict": row["verdict"],
                       "attempt": row["attempt"]})
         if st["state"] != "in_progress":
@@ -407,13 +430,16 @@ def cmd_test(_args=None):
     def check(name, cond, detail=""):
         results.append((name, bool(cond), detail))
 
-    def mkproj(name, artifacts=()):
+    def mkproj(name, artifacts=(), project_artifacts=()):
         p = os.path.join(tmp, name)
         os.makedirs(p)
         ok, _ = _quiet(cmd_init, _ns(project=p))
         assert ok, "init 失败"
         for a in artifacts:
             with open(os.path.join(staging_dir(p), a), "w", encoding="utf-8") as f:
+                f.write("x\n")
+        for a in project_artifacts:      # 落在项目根的产物（如 README.md）
+            with open(os.path.join(p, a), "w", encoding="utf-8") as f:
                 f.write("x\n")
         return p
 
@@ -466,11 +492,22 @@ def cmd_test(_args=None):
         check("场景4 终态后拒收判定", not ok4 and "已结束" in out4, out4.strip()[:60])
 
         # 场景 5：run --auto 产物齐全 → released
-        p5 = mkproj("case5", artifacts=("form.json", "fact-sheet.md", "README.md"))
+        p5 = mkproj("case5", artifacts=("form.json", "fact-sheet.md"),
+                    project_artifacts=("README.md",))
         _quiet(cmd_run, _ns(project=p5))
         st5 = load_state(p5)
         check("场景5 自动模式 → released", st5["state"] == "released",
               "实际=%s" % st5["state"])
+
+        # 场景 5b：README 只在 staging、不在项目根 → N2 不算交付（need_at 回归）
+        p5b = mkproj("case5b", artifacts=("form.json", "fact-sheet.md", "README.md"))
+        _quiet(cmd_run, _ns(project=p5b))
+        st5b = load_state(p5b)
+        check("场景5b 发布物放错位置 → 不算交付（deferred）",
+              st5b["state"] == "deferred", "实际=%s" % st5b["state"])
+        check("场景5b 账本里 artifact 指项目根",
+              any((r.get("artifact") or "") == "README.md"
+                  for r in read_ledger(p5b)), "")
 
         # 场景 6：run --auto 缺产物 → 反复打回 → deferred
         p6 = mkproj("case6")
@@ -483,7 +520,10 @@ def cmd_test(_args=None):
         ex_ok = os.path.join(tmp, "exec_ok.sh")
         with open(ex_ok, "w", encoding="utf-8") as f:
             f.write("#!/usr/bin/env bash\n")
-            f.write('if [ -n "$PFLOW_NEED" ]; then : > "$PFLOW_STAGING/$PFLOW_NEED"; fi\n')
+            f.write('if [ -n "$PFLOW_NEED" ]; then\n')
+            f.write('  : > "$PFLOW_STAGING/$PFLOW_NEED"\n')
+            f.write('  [ -n "$PFLOW_PROJECT" ] && : > "$PFLOW_PROJECT/$PFLOW_NEED"\n')
+            f.write('fi\n')
             f.write('echo \'{"verdict": "pass", "score": 4, "reason": "外部执行器占位"}\'\n')
         os.chmod(ex_ok, 0o755)
 
@@ -547,7 +587,7 @@ def main(argv=None):
 
     d = sub.add_parser("done", help="提交一次判定")
     d.add_argument("node", help="节点 id，如 N2")
-    d.add_argument("--score", type=int, default=None, help="0-5 分")
+    d.add_argument("--score", type=float, default=None, help="0-5 分（可小数）")
     d.add_argument("--judge", default="quality", help="判定者署名")
     d.add_argument("--reason", default="", help="可验证的判据")
     d.add_argument("--verdict", default="pass", choices=["pass", "fail"])

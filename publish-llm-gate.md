@@ -354,14 +354,56 @@ selfopt 挑刺时，N1 事实表写明目标用户是「写 Python 的 **AI 智�
 放宽和合格长得一模一样。有分数才能发现"同类产物这次 2 分、上次 4 分"的**漂移**——
 那是放宽标准唯一能被抓到的形态。
 
+### 产物落在哪（`need_at`）
+
+节点表里每个节点标了产物落点，两边必须一致——这是 2026-09-12 实测踩到的坑：
+
+| 落点 | 用于 | 例 |
+|---|---|---|
+| `staging`（默认） | 中间产物，暂存区 `.publish-staging/` | `form.json`、`fact-sheet.md` |
+| `project` | **发布物本身**，覆盖项目里的同名文件 | `README.md` |
+
+坑在哪：N2 把 README 写进暂存区，N3 硬闸门查的却是项目根 → **闸门永远看不到产物**，
+一路判 fail 直到搁置。发布物就该落在项目根，N3 查的也是那里。
+
+### 判定收件箱（语义节点的唯一入口）
+
+机器判不了的节点（N4 质量裁判 / N5 装配 / N6 发布 / N7 收口）不猜、不放行，
+只读一个收件箱：
+
+```
+<项目>/.publish-staging/verdicts/<节点>.json
+    {"score": 0-5, "judge": "谁判的", "reason": "可验证的判据"}
+```
+
+三条规矩：
+
+1. **执行器只读不写。** 判定必须由执行器之外的主体投递——主 agent 派出的只读子 agent，
+   或人。执行器自己写 = 自评，闸门作废。
+2. **收件箱空着 = 判 fail。** 默认安全位，绝不因为"没判"而放行。
+3. **有分数下限的节点，判定必须给分。** 缺分数一样判 fail。
+
+这样"全自动"和"有人负责"不打架：能机器判的全自动跑，
+需要判断的必须有人（或子 agent）签字，签不了就不发。
+
 ### 配套脚本
 
-| 脚本 | 职责 |
-|---|---|
-| `scripts/publish_flow.py` | 状态机 + 判决账本（推进权） |
-| `scripts/detect_publish_form.sh` | N0 形态判定（skill / installer / github-project） |
-| `scripts/quality_metrics.py` | 客观代理指标（可机器算的那半边），对 README / SKILL.md 打分 |
-| `scripts/executor_example.py` | 外部执行器接入样板（真实执行器从 `--exec` 接进来） |
+| 脚本 | 职责 | 自检 |
+|---|---|---|
+| `scripts/publish_flow.py` | 状态机 + 判决账本（推进权） | 17 项 |
+| `scripts/local_executor.py` | **本机真实执行器**：机器节点真跑脚本，语义节点读收件箱 | 13 项 |
+| `scripts/detect_publish_form.sh` | N0 形态判定（skill / installer / github-project） | 5 项 |
+| `scripts/quality_metrics.py` | 客观代理指标（可机器算的那半边），对 README / SKILL.md 打分 | 6 项 |
+| `scripts/executor_example.py` | 外部执行器接入样板（教怎么换成自己的执行器） | — |
 
-四个都自带 `--test`，一条命令可自证。
+每个都自带 `--test`，一条命令可自证。
+
+### 怎么跑一次
+
+```bash
+python3 scripts/publish_flow.py --project <项目> init
+python3 scripts/publish_flow.py --project <项目> run --auto \
+    --exec "python3 scripts/local_executor.py"
+python3 scripts/publish_flow.py --project <项目> status
+```
 

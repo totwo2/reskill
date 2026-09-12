@@ -129,6 +129,10 @@ def score_skill(lines):
             usage_line = i
             break
     usage_ratio = (usage_line / total) if usage_line is not None else 1.0
+    # 位置要求：前 1/3，但对短文件放宽到前 20 行。
+    # 道理：十几行的文件本就一屏看完，"前 1/3"这个相对指标在这里没有意义，
+    # 只会把合格的短文件误判为不合格（2026-09-12 实测踩到）。
+    usage_limit = max(total / 3.0, 20.0)
     triggers = count_triggers(lines)
     fm_ok = 1.0 if {"name", "description"} <= keys else 0.0
 
@@ -139,10 +143,10 @@ def score_skill(lines):
         elif name.startswith("frontmatter"):
             v, note = fm_ok, "找到字段 %s" % ",".join(sorted(keys)) if keys else "无 frontmatter"
         elif name.startswith("用法"):
-            v, note = (1.0 if usage_ratio < 1 / 3 else 0.0), \
-                      ("用法在第 %s 行 / 共 %d 行（%.0f%%）"
-                       % (usage_line, total, usage_ratio * 100) if usage_line is not None
-                       else "未找到用法章节")
+            v = 1.0 if (usage_line is not None and usage_line < usage_limit) else 0.0
+            note = ("用法在第 %s 行 / 共 %d 行（%.0f%%，上限 %.0f 行）"
+                    % (usage_line + 1, total, usage_ratio * 100, usage_limit)
+                    if usage_line is not None else "未找到用法章节")
         else:
             v, note = (1.0 if triggers >= 5 else 0.0), "触发词 %d 个" % triggers
         rows.append({"check": name, "weight": w, "value": round(v, 2), "note": note})
