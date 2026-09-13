@@ -53,6 +53,7 @@ LEDGER_FILE = "ledger.jsonl"
 #             发布物本来就该覆盖项目里的同名文件，N3 硬闸门查的也是项目根）
 # min_score : 分数下限，None = 只判 pass/fail
 # judge     : 该节点的判定者身份（署名用）
+# external  : True = 判定来自外部（收件箱），不是执行器自己算出来的
 # good      : 质量卡的「合格样本」——这一步的好长什么样
 NODES = [
     {
@@ -78,25 +79,29 @@ NODES = [
     },
     {
         "id": "N4", "name": "质量裁判", "need": None, "min_score": 3,
-        "judge": "quality",
+        "judge": "quality", "external": True,
         "good": "独立判定者按该步产物的真实用户身份打分，判据带锚点",
     },
     {
         "id": "N5", "name": "装配", "need": None, "min_score": None,
-        "judge": "audit",
+        "judge": "audit", "external": True,
         "good": "只动了该动的文件，没有顺手优化别处",
     },
     {
         "id": "N6", "name": "发布", "need": None, "min_score": None,
-        "judge": "script",
+        "judge": "releaser", "external": True,
         "good": "双平台产物齐备，Release 已建成",
     },
     {
         "id": "N7", "name": "收口", "need": None, "min_score": None,
-        "judge": "script",
+        "judge": "releaser", "external": True,
         "good": "三行契约齐、监控清单已同步",
     },
 ]
+
+# 需要外部判定的节点（语义判：脚本判不了"好不好"）。
+# 这是单一真源，执行器与派发器都从这里取，不许各写一份。
+EXTERNAL_NODES = tuple(n["id"] for n in NODES if n.get("external"))
 
 VALID_STATES = ("in_progress", "released", "deferred")
 
@@ -134,6 +139,15 @@ def artifact_path(project, node):
     base = os.path.abspath(project) if node.get("need_at") == "project" \
         else staging_dir(project)
     return os.path.join(base, node["need"])
+
+
+def inbox_path(project, node_id):
+    """判定收件箱：判定者（只读子 agent / 人）唯一有权写入的地方。"""
+    return os.path.join(staging_dir(project), "verdicts", "%s.json" % node_id)
+
+
+def inbox_present(project, node_id):
+    return os.path.exists(inbox_path(project, node_id))
 
 
 def load_state(project):
@@ -313,8 +327,11 @@ def _run_external(project, node, attempt, cmd):
     约定——环境变量传入上下文：
         PFLOW_NODE / PFLOW_PROJECT / PFLOW_STAGING / PFLOW_ATTEMPT / PFLOW_NEED / PFLOW_MIN_SCORE
     约定——stdout 最后一行 JSON 回抛判定：
-        {"verdict": "pass|fail", "score": 0-5|null, "reason": "可验证的判据"}
+        {"verdict": "pass|fail", "score": 0-5|null,
+         "reason": "可验证的判据", "judge": "判定者署名"}
     退出码非 0，或没给出 JSON → 一律判 fail（默认安全位）。
+    judge 缺省时回落到节点表的默认判定者；实际判定者的署名必须落账，
+    否则事后翻账时查不出当初是谁判的 pass。
     """
     env = dict(os.environ)
     env.update({
@@ -330,13 +347,13 @@ def _run_external(project, node, attempt, cmd):
         r = subprocess.run(cmd, shell=True, capture_output=True,
                            text=True, env=env, timeout=1800)
     except subprocess.TimeoutExpired:
-        return False, None, "[执行器超时 1800s] %s" % cmd
+        return False, None, "[执行器超时 1800s] %s" % cmd, None
     except Exception as e:                       # noqa: BLE001
-        return False, None, "[执行器无法启动：%s] %s" % (e, cmd)
+        return False, None, "[执行器无法启动：%s] %s" % (e, cmd), None
 
     if r.returncode != 0:
         return False, None, "[执行器 exit %d] %s" % (
-            r.returncode, (r.stderr or "").strip()[:200])
+            r.returncode, (r.stderr or "").strip()[:200]), None
 
     payload = None
     for line in reversed((r.stdout or "").strip().splitlines()):
@@ -349,10 +366,11 @@ def _run_external(project, node, attempt, cmd):
                 continue
     if payload is None:
         return False, None, ("[执行器未回抛 JSON 判定] %s"
-                             % (r.stdout or "").strip()[:200])
+                             % (r.stdout or "").strip()[:200]), None
 
     verdict = payload.get("verdict", "fail")
-    return (verdict == "pass"), payload.get("score"), payload.get("reason", "")
+    return ((verdict == "pass"), payload.get("score"),
+            payload.get("reason", ""), payload.get("judge") or None)
 
 
 def cmd_run(args):
@@ -361,20 +379,39 @@ def cmd_run(args):
     两种执行器：
       内置占位（默认）  产物存在即视为通过 —— 只验机制，不产内容
       外部（--exec）    真实执行器的接入点，负责生成产物并回抛判定
+
+    --pause-external 是无人值守 + 派发器的工作位：
+      走到需外部判定的节点、而收件箱里还没有判定时，**停下等投递**，
+      不消耗重试次数、不落账本 —— 「还没人判」不等于「判 fail」。
+      没人判就一路判死搁置，等于把没人来得及判的东西当垃圾扔掉。
     """
     st = load_state(args.project)
     trace = []
     guard = 0
     external = bool(getattr(args, "exec_cmd", None))
+    pause_ext = bool(getattr(args, "pause_external", False))
 
     while st["state"] == "in_progress" and guard < 200:
         guard += 1
         node = NODES[st["node_index"]]
         attempt = st["attempts"].get(node["id"], 0) + 1
 
+        if (external and pause_ext and node.get("external")
+                and not inbox_present(st["project"], node["id"])):
+            emit({"ok": True, "state": st["state"], "node_index": st["node_index"],
+                  "executor": "external", "awaiting": node["id"],
+                  "awaiting_name": node["name"],
+                  "reason": "%s（%s）需外部判定，收件箱没有判定 —— 停下等投递"
+                            % (node["id"], node["name"]),
+                  "trace": trace})
+            return 0
+
+        judge = node["judge"]
         if external:
-            passed, score, reason = _run_external(
+            passed, score, reason, ext_judge = _run_external(
                 st["project"], node, attempt, args.exec_cmd)
+            if ext_judge:
+                judge = ext_judge        # 实际判定者的署名优先，不被节点默认值吞掉
         else:
             ap = artifact_path(st["project"], node)
             if ap:
@@ -393,9 +430,9 @@ def cmd_run(args):
                     reason, score, node["min_score"])
 
         row = _apply_verdict(st["project"], st, node, passed, score,
-                             node["judge"], reason, None)
+                             judge, reason, None)
         trace.append({"node": node["id"], "verdict": row["verdict"],
-                      "attempt": row["attempt"]})
+                      "attempt": row["attempt"], "judge": row["judge"]})
         if st["state"] != "in_progress":
             break
 
@@ -408,7 +445,7 @@ def cmd_run(args):
 def _ns(**kw):
     base = {"project": None, "node": None, "score": None,
             "judge": "quality", "reason": "", "verdict": "pass",
-            "artifact": None, "exec_cmd": None}
+            "artifact": None, "exec_cmd": None, "pause_external": False}
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -524,7 +561,8 @@ def cmd_test(_args=None):
             f.write('  : > "$PFLOW_STAGING/$PFLOW_NEED"\n')
             f.write('  [ -n "$PFLOW_PROJECT" ] && : > "$PFLOW_PROJECT/$PFLOW_NEED"\n')
             f.write('fi\n')
-            f.write('echo \'{"verdict": "pass", "score": 4, "reason": "外部执行器占位"}\'\n')
+            f.write('echo \'{"verdict": "pass", "score": 4, '
+                    '"reason": "外部执行器占位", "judge": "ext-judge"}\'\n')
         os.chmod(ex_ok, 0o755)
 
         p7 = mkproj("case7")
@@ -536,6 +574,9 @@ def cmd_test(_args=None):
         check("场景7 外部判定照样落账",
               len(led7) == len(NODES) and all(r["judge"] for r in led7),
               "%d 条" % len(led7))
+        check("场景7 实际判定者署名落账（不被节点默认值吞掉）",
+              all(r["judge"] == "ext-judge" for r in led7),
+              "judges=%s" % sorted({r["judge"] for r in led7}))
 
         # 场景 8：外部执行器失败 → 反复打回 → deferred
         ex_bad = os.path.join(tmp, "exec_bad.sh")
@@ -553,6 +594,54 @@ def cmd_test(_args=None):
         check("场景8 失败原因照样落账",
               any("执行器 exit" in (r.get("reason") or "")
                   for r in read_ledger(p8)), "")
+
+        # 场景 9：pause-external —— 撞到语义节点缺判定 → 停下等投递，不判死
+        # 测试桩只模拟「收件箱有/没有」两种回抛，署名从收件箱侧派生。
+        # 收件箱本身的解析与门槛（score < min_score 等）由 local_executor 自检覆盖。
+        ex_inbox = os.path.join(tmp, "exec_inbox.sh")
+        with open(ex_inbox, "w", encoding="utf-8") as f:
+            f.write("#!/usr/bin/env bash\n")
+            f.write('V="$PFLOW_STAGING/verdicts/$PFLOW_NODE.json"\n')
+            f.write('if [ -f "$V" ]; then\n')
+            f.write('  echo \'{"verdict": "pass", "score": 4.5, '
+                    '"reason": "判定来自收件箱", "judge": "reader-1"}\'\n')
+            f.write('else\n')
+            f.write('  echo \'{"verdict": "pass", "score": 4, '
+                    '"reason": "机器节点占位", "judge": "ext-judge"}\'\n')
+            f.write('fi\n')
+        os.chmod(ex_inbox, 0o755)
+
+        p9 = mkproj("case9")
+        _quiet(cmd_run, _ns(project=p9, exec_cmd=ex_inbox, pause_external=True))
+        st9 = load_state(p9)
+        check("场景9 缺判定 → 停在 N4（不判死）",
+              st9["state"] == "in_progress"
+              and NODES[st9["node_index"]]["id"] == "N4",
+              "state=%s idx=%s" % (st9["state"], st9["node_index"]))
+        check("场景9 停下不消耗重试次数", st9["attempts"] == {},
+              "attempts=%s" % st9["attempts"])
+        check("场景9 机器节点落账、语义节点未落账",
+              [r["node"] for r in read_ledger(p9)] == ["N0", "N1", "N2", "N3"],
+              str([r["node"] for r in read_ledger(p9)]))
+
+        # 场景 9b：投递判定后再跑 → 推进到下一个语义节点，署名正确落账
+        vd9 = os.path.join(staging_dir(p9), "verdicts")
+        if not os.path.isdir(vd9):
+            os.makedirs(vd9)
+        with open(os.path.join(vd9, "N4.json"), "w", encoding="utf-8") as f:
+            f.write(json.dumps({"score": 4.5, "judge": "reader-1",
+                                "reason": "README.md:3 讲清了装的收益"},
+                               ensure_ascii=False))
+        _quiet(cmd_run, _ns(project=p9, exec_cmd=ex_inbox, pause_external=True))
+        st9b = load_state(p9)
+        check("场景9b 投递后继续推进到 N5",
+              st9b["state"] == "in_progress"
+              and NODES[st9b["node_index"]]["id"] == "N5",
+              "idx=%s" % st9b["node_index"])
+        check("场景9b 实际判定者署名落账",
+              any(r["node"] == "N4" and r["judge"] == "reader-1"
+                  for r in read_ledger(p9)),
+              str([(r["node"], r["judge"]) for r in read_ledger(p9)]))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -597,6 +686,8 @@ def main(argv=None):
     r.add_argument("--auto", action="store_true", help="无需人工输入")
     r.add_argument("--exec", dest="exec_cmd", default=None,
                    help="外部执行器命令；留空则用内置占位执行器（产物存在即通过）")
+    r.add_argument("--pause-external", dest="pause_external", action="store_true",
+                   help="走到需外部判定的节点、收件箱为空时停下等投递（不消耗重试次数）")
 
     args = p.parse_args(argv)
 

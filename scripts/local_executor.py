@@ -75,9 +75,12 @@ def run(cmd, timeout=TIMEOUT):
         return 125, "", "无法启动：%s" % e
 
 
-def verdict(passed, score=None, reason=""):
-    return {"verdict": "pass" if passed else "fail",
-            "score": score, "reason": reason}
+def verdict(passed, score=None, reason="", judge=None):
+    out = {"verdict": "pass" if passed else "fail",
+           "score": score, "reason": reason}
+    if judge:
+        out["judge"] = judge      # 判定者署名要跟着判定一起回抛，账本才有据可查
+    return out
 
 
 # ---------------------------------------------------------------- 机器判节点
@@ -193,7 +196,13 @@ def read_inbox(ctx):
 
 
 def node_external(ctx):
-    """语义节点：读判定收件箱。空着 = 判不了 = fail（默认安全位）。"""
+    """语义节点：读判定收件箱。空着 = 判不了 = fail（默认安全位）。
+
+    一条判定要成立，必须「署名 + 判据」齐备：
+        没署名 → 查不出是谁判的 = 无人负责
+        没判据 → 说了话但没有依据 = 无法复核
+    两者缺一即不予采信，宁可搁置不可错发。
+    """
     v = read_inbox(ctx)
     if v is None:
         return verdict(False, None,
@@ -202,26 +211,46 @@ def node_external(ctx):
                        "（执行器只读不写——判定须由只读子 agent 或人投递）"
                        % (ctx["node"], ctx["node"]))
 
-    judge = v.get("judge") or "未署名"
-    reason = v.get("reason") or "（无判据）"
+    judge = v.get("judge")
+    if not judge:
+        return verdict(False, v.get("score"),
+                       "%s 判定没有署名（缺 judge）：无人负责的判定不予采信"
+                       % ctx["node"], judge="(未署名)")
+    if not v.get("reason"):
+        return verdict(False, v.get("score"),
+                       "%s 判定没有判据（缺 reason）：无法复核的判定不予采信"
+                       % ctx["node"], judge=judge)
+
+    reason = v["reason"]
     score = v.get("score")
 
+    # 署名必须跟着每一次判决回抛，不只是通过的那次。
+    # 否决同样要留名，否则事后翻账只查得出"这步没过"，查不出"谁否的"。
     if ctx["min_score"]:
         if score is None:
             return verdict(False, None, "%s 有分数下限 %s，但判定没给分（judge=%s）"
-                           % (ctx["node"], ctx["min_score"], judge))
+                           % (ctx["node"], ctx["min_score"], judge), judge=judge)
         if float(score) < float(ctx["min_score"]):
             return verdict(False, score, "%s 得分 %s < 下限 %s（judge=%s）"
-                           % (ctx["node"], score, ctx["min_score"], judge))
+                           % (ctx["node"], score, ctx["min_score"], judge),
+                           judge=judge)
     return verdict(True, score, "%s 外部判定通过：%s（judge=%s）"
-                   % (ctx["node"], reason[:300], judge))
+                   % (ctx["node"], reason[:300], judge), judge=judge)
 
+
+# 语义节点：判定来自收件箱，而不是执行器自己算出来的。
+# 单一真源在 publish_flow.NODES 的 external 字段——这里不再各写一份，
+# 否则节点表加了外部节点、执行器不知道，就会出现"该派的没派"。
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import publish_flow as pf                              # noqa: E402
+
+EXTERNAL_NODES = pf.EXTERNAL_NODES
 
 HANDLERS = {
     "N0": node_n0, "N1": node_n1, "N2": node_n2, "N3": node_n3,
-    "N4": node_external, "N5": node_external,
-    "N6": node_external, "N7": node_external,
 }
+HANDLERS.update({n: node_external for n in EXTERNAL_NODES})
 
 
 def execute(ctx):
@@ -417,6 +446,53 @@ def run_test():
         check("N4 缺分数 → fail",
               v4d["verdict"] == "fail" and "没给分" in v4d["reason"],
               v4d["reason"][:80])
+
+        # 9b) 判定没署名 → 不予采信（无人负责）
+        _write(os.path.join(p0, ".publish-staging", "verdicts", "N4.json"),
+               json.dumps({"score": 4, "reason": "看着还行"},
+                          ensure_ascii=False))
+        v4e = execute(ctx_of(p0, "N4", min_score=3))
+        check("N4 判定未署名 → fail",
+              v4e["verdict"] == "fail" and "署名" in v4e["reason"],
+              v4e["reason"][:80])
+
+        # 9c) 判定没判据 → 不予采信（无法复核）
+        _write(os.path.join(p0, ".publish-staging", "verdicts", "N4.json"),
+               json.dumps({"score": 4, "judge": "reader-1"},
+                          ensure_ascii=False))
+        v4f = execute(ctx_of(p0, "N4", min_score=3))
+        check("N4 判定缺判据 → fail",
+              v4f["verdict"] == "fail" and "判据" in v4f["reason"],
+              v4f["reason"][:80])
+
+        # 9d) 判定的署名要跟着回抛（账本才有据可查）
+        _write(os.path.join(p0, ".publish-staging", "verdicts", "N4.json"),
+               json.dumps({"score": 4.5, "judge": "reader-7",
+                           "reason": "README.md:3 首屏讲清了装的收益"},
+                          ensure_ascii=False))
+        v4g = execute(ctx_of(p0, "N4", min_score=3))
+        check("N4 判定署名随判定回抛",
+              v4g["verdict"] == "pass" and v4g.get("judge") == "reader-7",
+              "judge=%s" % v4g.get("judge"))
+
+        # 9e) 否决的判定同样要带署名 —— 事后翻账要能查出"谁否的"
+        _write(os.path.join(p0, ".publish-staging", "verdicts", "N4.json"),
+               json.dumps({"score": 1, "judge": "reader-9",
+                           "reason": "README.md:2 看不出收益"},
+                          ensure_ascii=False))
+        v4h = execute(ctx_of(p0, "N4", min_score=3))
+        check("N4 否决也带署名（谁否的要查得到）",
+              v4h["verdict"] == "fail" and v4h.get("judge") == "reader-9",
+              "judge=%s" % v4h.get("judge"))
+
+        # 9f) 判定压根没署名 → 回抛里明示未署名，不冒用节点默认判定者
+        _write(os.path.join(p0, ".publish-staging", "verdicts", "N4.json"),
+               json.dumps({"score": 4, "reason": "看着还行"},
+                          ensure_ascii=False))
+        v4i = execute(ctx_of(p0, "N4", min_score=3))
+        check("N4 未署名 → 回抛里明示未署名",
+              v4i["verdict"] == "fail" and v4i.get("judge") == "(未署名)",
+              "judge=%s" % v4i.get("judge"))
 
         # 10) 执行器只读不写收件箱
         before = sorted(os.listdir(os.path.join(p0, ".publish-staging", "verdicts")))

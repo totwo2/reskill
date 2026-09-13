@@ -7,7 +7,8 @@ description: |
   发 skill 之前先审代码：第三方审计代理对照需求查覆盖/超纲/幻觉，再过质量闸门——
   形态适配（GitHub 项目 / SkillHub 三分支判定）、简介与标签、README 用户视角、SKILL.md 大模型视角。
   过闸后按判定结果发布到 GitHub + SkillHub，追踪下载量趋势、收集 issue 反馈、多渠道通知作者决策。
-  触发词：发布skill、推到github、推到skillhub、审代码、代码真的实现了吗、有没有超纲、
+  触发词：发布skill、推到github、推到skillhub、发版、走完整发布流程、全自动发布、
+  审代码、代码真的实现了吗、有没有超纲、谁来判、判定派发、
   检查反馈、用户意见、优化skill、下载量、下载趋势、同步skill列表、查名下skill、配置通知
 license: MIT
 allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
@@ -24,7 +25,8 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | 用户说 | 动作 |
 |--------|------|
 | "发布skill" / "推到github" / "推到skillhub" | **publish-code-audit.md 审代码** → publish-quality.md 质量闸门 → publish.md 发布 |
-| "发版" / "走完整发布流程" / "全自动发布" | **scripts/publish_flow.py**（状态机）+ **scripts/local_executor.py**（真实执行器）→ N0→N7 无人值守 |
+| "发版" / "走完整发布流程" / "全自动发布" | **scripts/local_publish.py**（单入口：一条命令反复调，机器节点自动判、语义节点停下出题） |
+| "谁来判" / "这一步好不好谁负责" / "判定派发" | **scripts/verdict_dispatch.py** → 出题（判定任务单）/ 收卷（校验判定合法性） |
 | "审代码" / "这代码真的实现了吗" / "有没有超纲" | **publish-code-audit.md** → 覆盖表 / 超纲表 / 幻觉表 |
 | "检查发布物质量" / "这 README 行不行" | publish-quality.md → 双维度打分 |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查 GitHub issues + SkillHub 数据 |
@@ -73,6 +75,8 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | **本机真实执行器** | **scripts/local_executor.py** | **机器节点真跑脚本；语义节点读「判定收件箱」，收不到就不放行** |
 | **客观代理指标** | **scripts/quality_metrics.py** | **给 README / SKILL.md 打客观分，判定者想松口时顶住它** |
 | **形态判定** | **scripts/detect_publish_form.sh** | **N0：skill / installer / github-project 三路判定** |
+| **本机发布单入口** | **scripts/local_publish.py** | **一条命令反复调：机器节点自动判、语义节点停下出题；退出码 0=终态 / 10=等投递 / 1=错误** |
+| **判定派发** | **scripts/verdict_dispatch.py** | **出题（生成判定任务单）/ 收卷（校验判定合法性，只校验不改判定）** |
 | 下载量追踪 | scripts/check_downloads.py | SkillHub下载量趋势快照+增量提醒 |
 | 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
 | 发布前扫描 | scripts/preflight_publish_check.sh | 凭据 + 个人痕迹 + 结构，综合闸门 |
