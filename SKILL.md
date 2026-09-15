@@ -1,7 +1,7 @@
 ---
 name: reskill
 slug: reskill
-version: 3.0.0
+version: 3.2.0
 displayName: Skill发布质量闸门与反馈系统
 description: |
   发 skill 之前先审代码：第三方审计代理对照需求查覆盖/超纲/幻觉，再过质量闸门——
@@ -10,6 +10,25 @@ description: |
   触发词：发布skill、推到github、推到skillhub、发版、走完整发布流程、全自动发布、
   审代码、代码真的实现了吗、有没有超纲、谁来判、判定派发、
   检查反馈、用户意见、优化skill、下载量、下载趋势、同步skill列表、查名下skill、配置通知
+topics:
+  - skill-publishing
+  - release-automation
+  - publish-pipeline
+  - github-release
+  - skillhub
+  - quality-gate
+  - code-audit
+  - preflight-check
+  - version-management
+  - ci-cd
+  - one-click-publish
+  - publish-safety
+  - unattended-release
+  - release-checklist
+  - download-tracking
+  - feedback-collection
+  - content-quality
+  - skill-maintenance
 license: MIT
 allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 ---
