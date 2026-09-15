@@ -11,6 +11,7 @@ description: |
   审代码、代码真的实现了吗、有没有超纲、谁来判、判定派发、
   检查反馈、用户意见、优化skill、下载量、下载趋势、同步skill列表、查名下skill、配置通知
 topics:
+  - agent-skills
   - skill-publishing
   - release-automation
   - publish-pipeline
