@@ -359,7 +359,19 @@ selfopt 是反面（**0 个 topics**，而它下载量 201，纯靠 SkillHub 站
 - [ ] 双平台同名可对应
 - [ ] description 已写且是用户视角
 - [ ] topics 已填且两组词齐全
+- [ ] **每个 topic 都有人搜**（跑 `scripts/check_discoverability.py`；池子低于下限的换掉，别留只有自己的词）
+- [ ] **名称查过重名**（同名且更热的竞品存在时，搜这个词的人先看到别人——此项只报不拦，改名代价高）
 - [ ] SkillHub 侧触发词已写
 - [ ] 版本号双平台数字一致
 
 **任一项不过 → 不许发布。** 这比"发布后再改"便宜得多（发布过同版本不可重发，改一次要升版本号）。
+
+### 两张清单别混：合不合规 vs 有没有人搜
+
+| | 问的是 | 谁判 |
+|---|---|---|
+| `preflight_quality_check.py` | **有没有**（≥10 个 topics、含效果词、description 无黑话） | 本地，离线 |
+| `check_discoverability.py` | **好不好用**（每个 topic 的真实搜索池、名称是否被占） | 要联网查 GitHub Search |
+
+**前者过了不等于后者过。** 真实教训：20 个 topics 里 8 个池子 ≤3（`publish-pipeline` 全站只有自己 1 个），
+`preflight_quality_check.py` 全 PASS —— 因为它量的是"有没有分两组"，不是"这词有没有人搜"。

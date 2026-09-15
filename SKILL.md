@@ -1,7 +1,7 @@
 ---
 name: reskill
 slug: reskill
-version: 3.2.0
+version: 3.3.0
 displayName: Skill发布质量闸门与反馈系统
 description: |
   发 skill 之前先审代码：第三方审计代理对照需求查覆盖/超纲/幻觉，再过质量闸门——
@@ -49,6 +49,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | "谁来判" / "这一步好不好谁负责" / "判定派发" | **scripts/verdict_dispatch.py** → 出题（判定任务单）/ 收卷（校验判定合法性） |
 | "审代码" / "这代码真的实现了吗" / "有没有超纲" | **publish-code-audit.md** → 覆盖表 / 超纲表 / 幻觉表 |
 | "检查发布物质量" / "这 README 行不行" | publish-quality.md → 双维度打分 |
+| "能不能被搜到" / "topics 怎么写" / "可发现性" | scripts/check_discoverability.py → 量每个 topic 的真实搜索池 + 名称查重 |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查 GitHub issues + SkillHub 数据 |
 | "下载量" / "下载趋势" / "有没有新下载" | scripts/check_downloads.py → 对比快照+增量提醒 |
 | "同步skill列表" / "查名下skill" | scripts/fetch_my_skills.py → 拉取名下skill+对比本地 |
@@ -100,6 +101,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | 下载量追踪 | scripts/check_downloads.py | SkillHub下载量趋势快照+增量提醒 |
 | 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
 | 发布前扫描 | scripts/preflight_publish_check.sh | 凭据 + 个人痕迹 + 结构，综合闸门 |
+| 可发现性 | scripts/check_discoverability.py | 量每个 topic 的真实搜索池（低于下限=没人搜）+ 名称查重。需联网 |
 
 ---
 

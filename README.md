@@ -102,6 +102,7 @@ reskill/
 │   ├── preflight_quality_check.py  # 质量闸门
 │   ├── preflight_publish_check.sh  # 发布前检查
 │   ├── preflight_secret_scan.sh    # 凭据扫描
+│   ├── check_discoverability.py    # 可发现性：topic 有没有人搜 + 名称有没有被占
 │   ├── gh_skill.py                 # GitHub skill 操作
 │   ├── gh_release.py               # Release 与 topics
 │   ├── check_downloads.py          # 下载量追踪
@@ -121,10 +122,11 @@ python3 publish_flow.py --test        # 23 项：跳步被拒 / 低分不放行 
 python3 local_executor.py --test      # 18 项：机器节点真跑，语义节点收件箱空着就不放行
 python3 verdict_dispatch.py --test    # 25 项：任务单必须带证据 / 判定校验区分"没判好"与"判定说不"
 python3 quality_metrics.py --test     # 6 项：客观指标能区分好样本与坏样本
+python3 check_discoverability.py --self-test   # 17 项：死词抓得住 / 拿不到数据不误判
 ./detect_publish_form.sh --test       # 5 项：四条发布路径判定正确
 ```
 
-看到 `结果：N 通过 / 0 失败` 就算通过。合计 **92 项**。
+看到 `结果：N 通过 / 0 失败` 就算通过。合计 **109 项**。
 
 ## 想接自己的执行器
 

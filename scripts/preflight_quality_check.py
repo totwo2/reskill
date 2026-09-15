@@ -57,11 +57,30 @@ IMPL_JARGON = [
 ]
 
 # 效果作用词：topics 里至少要有这些，才说明照顾到"被痛点扎到的人"
+#
+# ⚠️ 这张表是**通用默认值**，不是硬指标。它只回答「有没有一个效果类词」，
+#    不回答「这个词有没有人搜」——后者由 scripts/check_discoverability.py 量真实搜索池。
+#    领域不同效果词也不同，可用 --effect-words 覆盖（如发布工具关心的是省事/少出错，
+#    不是 token/latency）。曾经这张表只写了另一个项目（省 token）的词，对发布工具是空的。
 EFFECT_WORDS = [
+    # 性能 / 成本类
     "token-optimization", "token", "latency", "cost-optimization", "cost",
     "performance", "speed", "提速", "优化", "加速", "saving", "efficiency",
-    "自动化", "automation", "productivity",
+    # 自动化 / 效率类
+    "自动化", "automation", "productivity", "workflow-automation",
+    "developer-productivity", "time-saving", "one-click",
+    # 质量 / 可靠类
+    "code-quality", "quality-assurance", "best-practices", "reliability",
+    # 发布 / 交付类
+    "publishing", "release", "delivery", "ci-cd", "deployment",
 ]
+
+
+def set_effect_words(extra):
+    """追加效果作用词（--effect-words）。只加不减，避免把默认表误删成空表。"""
+    global EFFECT_WORDS
+    EFFECT_WORDS = list(EFFECT_WORDS) + [w.strip().lower() for w in extra.split(",") if w.strip()]
+
 
 # 开发日志特征词（SKILL.md 禁写）
 DEVLOG_PATTERNS = [
@@ -422,8 +441,14 @@ def main():
     ap.add_argument("--platform", choices=["github", "skillhub"], help="按哪个平台规则查")
     ap.add_argument("--topics", help="逗号分隔的 topics（GitHub 侧用；不传则跳过不误判）")
     ap.add_argument("--description", help="平台上的简介文本（不传则跳过）")
+    ap.add_argument("--effect-words",
+                    help="追加效果作用词（逗号分隔），补在默认表之后；领域不同时用它覆盖，"
+                         "例如发布工具关心省事/少出错，而不是 token/latency")
     ap.add_argument("--test", action="store_true", help="自检：验证规则本身判得对不对")
     args = ap.parse_args()
+
+    if args.effect_words:
+        set_effect_words(args.effect_words)
 
     if args.test:
         return run_test()
