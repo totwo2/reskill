@@ -65,9 +65,9 @@ reskill 是一个 **Skill 发布、反馈收集与持续优化系统**。核心�
 
 **内容**：
 ```yaml
-repo:                          # GitHub 配置
+repo:                          # 平台配置（Gitee / GitHub 通用，示例）
   platform: github
-  owner: <your-gitee-account>
+  owner: <your-account>
   repos:
     - name: reskill
       skillhub_id: '87149'     # SkillHub 上的 ID
