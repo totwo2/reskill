@@ -35,14 +35,26 @@ bash "$SCRIPT_DIR/preflight_secret_scan.sh" . || FAIL=1
 # 2. 个人痕迹词库扫描（覆盖源码 + 文档 + 配置）
 # ============================================================
 echo "--- [2/3] 个人痕迹词库 ---"
-FILES=$(find . -type f \
-  -not -path "*/.git/*" \
-  -not -path "*/.venv/*" \
-  -not -path "*/__pycache__/*" \
-  -not -path "*/node_modules/*" \
-  -not -name "*.example.*" \
-  -not -name "preflight_publish_check.sh" \
-  -not -name "preflight_secret_scan.sh" 2>/dev/null)
+ALLOW_FILE="$SCRIPT_DIR/preflight_allow.txt"
+
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  # git 仓库：只取「已跟踪 + 未跟踪但未被忽略」的文件（与 secret_scan 同口径）
+  FILES=$( { git ls-files; git ls-files --others --exclude-standard; } 2>/dev/null \
+    | grep -vE '\.example\.' \
+    | grep -vE '(^|/)(preflight_publish_check|preflight_secret_scan)\.sh$' \
+    | grep -vE '(^|/)preflight_allow\.txt$' \
+    | sort -u )
+else
+  FILES=$(find . -type f \
+    -not -path "*/.git/*" \
+    -not -path "*/.venv/*" \
+    -not -path "*/__pycache__/*" \
+    -not -path "*/node_modules/*" \
+    -not -name "*.example.*" \
+    -not -name "preflight_publish_check.sh" \
+    -not -name "preflight_secret_scan.sh" \
+    -not -name "preflight_allow.txt" 2>/dev/null)
+fi
 
 # 词库：所有模式独立成行（中英文、大小写混合、变体），命中即拦。
 # 刻意排除：qclaw/openclaw（可选兼容功能）、启发式（heuristic 通用词）、通知/报告/文档（通用词）
@@ -74,22 +86,56 @@ PATFILE="$(mktemp)"
 trap 'rm -f "$PATFILE"' EXIT
 printf '%s\n' "${PATTERNS[@]}" > "$PATFILE"
 
-scanned=0; skipped=0
+scanned=0; skipped=0; waived=0
+
+# 豁免判定：preflight_allow.txt 每行 <文件glob>|<词条原文>|<理由>
+allowed() {  # $1=文件 $2=词条 → 0=已登记豁免
+  [ -f "$ALLOW_FILE" ] || return 1
+  local base g p r
+  base="$(basename "$1")"
+  while IFS='|' read -r g p r; do
+    case "${g:-}" in ''|\#*) continue ;; esac
+    # shellcheck disable=SC2254  —— glob 需展开，不能加引号
+    case "$base" in $g) ;; *) continue ;; esac
+    [ "$p" = "$2" ] && return 0
+  done < "$ALLOW_FILE"
+  return 1
+}
+
+# 该文件是否有豁免登记（有 → 跳过快速路径，确保每条命中都过豁免判定）
+has_allow() {
+  [ -f "$ALLOW_FILE" ] || return 1
+  local base g p r
+  base="$(basename "$1")"
+  while IFS='|' read -r g p r; do
+    case "${g:-}" in ''|\#*) continue ;; esac
+    case "$base" in $g) return 0 ;; esac
+  done < "$ALLOW_FILE"
+  return 1
+}
+
 for f in $FILES; do
   scanned=$((scanned+1))
   # 快速路径：合并 pattern 一次判空（grep -f 即多模式 OR）
-  if ! grep -qiEf "$PATFILE" "$f" 2>/dev/null; then
-    skipped=$((skipped+1)); continue
+  if ! has_allow "$f"; then
+    if ! grep -qiEf "$PATFILE" "$f" 2>/dev/null; then
+      skipped=$((skipped+1)); continue
+    fi
   fi
   # 慢速路径：确有命中的文件，逐条精确报出是哪个词条
   for p in "${PATTERNS[@]}"; do
     if grep -niE "$p" "$f" >/dev/null 2>&1; then
+      if allowed "$f" "$p"; then
+        waived=$((waived+1))
+        echo "  ⚪ 已豁免: ${p} @ ${f}（见 preflight_allow.txt）"
+        continue
+      fi
       hit "$p 命中: $f"
       grep -niE "$p" "$f" 2>/dev/null | head -2
     fi
   done
 done
-echo "  （扫描 $scanned 个文件；快速路径跳过 $skipped 个）"
+echo "  （扫描 $scanned 个文件；快速路径跳过 $skipped 个；豁免 $waived 条）"
 
 # ============================================================
 # 3. 结构完整性

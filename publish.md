@@ -52,7 +52,7 @@ bash scripts/preflight_secret_scan.sh .
 - **退出码 1 = 命中，立即中止发布**，修复命中项后重扫。
 - 综合检查覆盖（2026-08-25 教训固化）：
   1. 凭据扫描（复用 preflight_secret_scan.sh 全部模式）
-  2. 个人痕迹词库：第三方借鉴（Headroom/JiangGong/vLLM/…）、平台品牌（workbuddy）、实验语境（窗口一/实验 v4）、旧业务词（zhangsan/财务部/公文/审批…）、个人绝对路径、剥离/边界叙事（"已剥离"/"不含（边界说明）"）
+  2. 个人痕迹词库：第三方借鉴（Headroom/JiangGong/vLLM/…）、平台品牌（workbuddy）、实验语境（窗口一/实验 v4）、旧业务词（zhangsan/财务部/公文/审批…）、个人绝对路径、剥离/边界叙事（"已剥离"/"不含（边界说明）"）——**此处为摘要，完整词库以 `scripts/preflight_publish_check.sh` 的 PATTERNS 为单一真源**；本文件本身的这类命中已在 `scripts/preflight_allow.txt` 登记豁免
   3. 结构完整性：SKILL.md frontmatter、README 双语、MANIFEST 引用文件存在、pytest 配置有效、无 .venv/__pycache__ 入库
 
 **教训（2026-08-25）：** 仅凭据扫描不够——发布后才发现 README 非双语、含边界说明、代码带旧业务词/实验语境/品牌残留，被迫 force-push 重写历史。综合闸门把这些从"靠人审查"变成"机制拦截"。

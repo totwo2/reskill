@@ -31,3 +31,11 @@ settings/release_history/
 
 # Publish pipeline staging (artifacts, verdicts, ledger — instance data)
 .publish-staging/
+
+# Internal decision logs (author notes; contain local paths & internal context —
+# not for a public repo. Kept on disk locally.)
+DECISIONS-*.md
+
+# Archived third-party reference copy (no doc references it; contains platform
+# paths. Kept on disk locally, not published.)
+references/quibbler/

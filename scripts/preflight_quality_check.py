@@ -21,7 +21,7 @@ preflight_quality_check.py —— 发布物质量闸门（内容层）
    一律标 [LLM评]，不假装能判**——脚本只管形式，语义交给裁判 LLM。
 
 3. 我的适配点
-   - 规则原文出自 ~/.workbuddy/skills/reskill/publish-quality.md，不自行发明
+   - 规则原文出自本 skill 自带的 ../publish-quality.md，不自行发明
    - 老高不读代码（R-NOCODE）→ 自带 --test，一条命令自证，输出说人话
    - 平台元数据（topics/description）本地拿不到 → 支持 --topics / --meta 传入，
      没传就标 [缺数据] 而不是误判为 FAIL

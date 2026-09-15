@@ -245,7 +245,7 @@ issue状态：
 feedback_check:
   enabled: true
   schedule: "0 9 * * *"  # 每天09:00
-  channel: "session"  # WorkBuddy：直接在当前对话报告（替代 openclaw-weixin）
+  channel: "session"  # 直接在当前对话报告
   last_check: "2026-06-12"
 ```
 
