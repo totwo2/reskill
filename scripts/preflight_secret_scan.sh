@@ -45,7 +45,18 @@ PATTERNS=(
 )
 
 HIT=0
+
+# 性能：8 个模式逐文件逐条 grep，子进程启动开销会拖到分钟级
+# （实测 reskill 56 个文件 × 8 模式 ≈ 900 次 grep ≈ 30 秒）。
+# 做法 —— 先合并成一次 grep 判空（零命中直接跳过，这是绝大多数文件），
+# 只有确有命中的文件才走逐条精确匹配，以便逐条报出命中的是哪个模式。
+# 判定语义不变，只是省掉无用调用。与 preflight_publish_check.sh 同一做法。
+PATFILE="$(mktemp)"
+trap 'rm -f "$PATFILE"' EXIT
+printf '%s\n' "${PATTERNS[@]}" > "$PATFILE"
+
 for f in $FILES; do
+  grep -qiEf "$PATFILE" "$f" 2>/dev/null || continue
   for p in "${PATTERNS[@]}"; do
     if grep -nEi "$p" "$f" >/dev/null 2>&1; then
       echo "🔴 疑似凭据: $f"

@@ -1,7 +1,7 @@
 ---
 name: reskill
 slug: reskill
-version: 3.4.0
+version: 3.5.0
 kind: feature
 # kind 决定 README 前 30 行按哪套判据（闸门 preflight_quality_check.py）：
 #   perf    优化类 —— 收益本身是数字，必须给量化佐证（selfopt / no-bb 属此类）
@@ -46,11 +46,37 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 
 ---
 
+## 三段分工：谁判、谁审、谁发
+
+发布分成三段。**只有第三段可以单独使用**；前两段都是判定，判定不能自评。
+
+| 段 | 谁 | 用什么 | 判什么 |
+|---|---|---|---|
+| ① 机器判定 | `gate` 命令 | `gate check <目录>` / `gate inbox <目录>`；内部**复用**本 skill 的 `preflight_secret_scan.sh`、`preflight_publish_check.sh` | 硬错：凭据泄漏、个人痕迹、版本打架、topics 异常 |
+| ② 独立评审 | 「发布闸门专家团」`publish-gate-team` | 只读 `gate inbox` 产出的**物料箱** | 软质量：形态判断、简介与标签、README 首屏、文案、跨出口一致性 |
+| ③ 执行发布 | **本 skill 的脚本** | `gh_release.py` / `gh_skill.py` / `local_publish.py` | 不改判据，只按前两段的结论动手 |
+
+**三条边界（违反任意一条 = 拆闸门）：**
+
+- **① 不许绕过。** 直接跑 `preflight_*.sh` 而不经 `gate`，等于自己给自己判。`gate` 只是**调用**这些脚本——判据仍在本 skill 里，所以改判据等于同时改闸门，按纪律必须先报批。
+- **② 不许自评。** 本 skill 的 `preflight_quality_check.py` / `quality_metrics.py` 是**作者自查工具**，不能当终审。终审是专家团（独立上下文，陌生人视角）。
+- **③ 是唯一可单独使用的段。** `gate` 只判不放行——它不写 README、不打包、不推 GitHub、不推 SkillHub。最后一米永远是本 skill 的脚本。
+
+> 一句话：**reskill 是「闸门之后的执行手册 + 判据库」，不是「可以绕过的裁判」。**
+
+---
+
 ## 启动路由
+
+> **发布类请求第一步永远是 `gate inbox <候选包目录>`。**
+> 它一次完成「检查 + 冻结指纹 + 打包物料箱」，并把**物料箱目录**打印出来 ——
+> 那个目录就是交给「发布闸门专家团」（`publish-gate-team`）的**全部输入**。
+> 机器判定 `REJECT` → 就地改产物重跑，不要往下走。
+> 给专家的东西只有两样：**物料箱路径 + 该岗位判据路径**，多一个字都是喂料。
 
 | 用户说 | 动作 |
 |--------|------|
-| "发布skill" / "推到github" / "推到skillhub" | **publish-code-audit.md 审代码** → publish-quality.md 质量闸门 → publish.md 发布 |
+| "发布skill" / "推到github" / "推到skillhub" | **`gate inbox`** → 召唤「发布闸门专家团」审 → publish.md 执行发布 |
 | "发版" / "走完整发布流程" / "全自动发布" | **scripts/local_publish.py**（单入口：一条命令反复调，机器节点自动判、语义节点停下出题） |
 | "谁来判" / "这一步好不好谁负责" / "判定派发" | **scripts/verdict_dispatch.py** → 出题（判定任务单）/ 收卷（校验判定合法性） |
 | "审代码" / "这代码真的实现了吗" / "有没有超纲" | **publish-code-audit.md** → 覆盖表 / 超纲表 / 幻觉表 |
@@ -201,10 +227,14 @@ AI用token调API，确认能访问仓库
 **六个条件全绿 = 发布完成，立即收口，禁止再输出"改进建议 / 后续可优化"。**
 
 0. **第三方审计两跑通过**：N0.5 幻觉表 0 命中 + 覆盖表无 ❌；N4.5 文档每条命令/入口/数字都有源码锚点
-1. `scripts/preflight_publish_check.sh` 退出码 0
+1. **`gate check <候选包>` 退出码 0**（闸门内部会调用 `preflight_publish_check.sh`，
+   但入口只能是 `gate` —— 直接跑 preflight 交差等于自评，不算数）
 2. 质量闸门四道全过（publish-quality.md 第五节打分，任一维度 <3 分不发）
 3. gh 与 sh 版本号数字对齐（gh 带 `v`，sh 不带）
-4. `fetch_my_skills.py` 已同步监控清单
+4. **监控清单已同步**：本次发布的 skill 必须出现在 `settings/reskill_config.yaml` 的 `skillhub.skills` 里
+   （写 `slug` + SkillHub 上的 `display_name` 原文）。
+   **已发布的 skill 一律自动纳入监控，不必询问 —— 这是发布动作的一部分，不是可选项。**
+   验收：`python3 scripts/fetch_my_skills.py --dry-run` 显示「新发布（本地无）: 0」。
 
 **完成后的输出契约固定三行**：版本号 / 平台链接 / 同步状态。写完闭嘴。
 

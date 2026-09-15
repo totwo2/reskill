@@ -88,51 +88,44 @@ printf '%s\n' "${PATTERNS[@]}" > "$PATFILE"
 
 scanned=0; skipped=0; waived=0
 
+# 豁免清单一次性载入内存（原先每判定一次就重读一遍文件，纯开销）
 # 豁免判定：preflight_allow.txt 每行 <文件glob>|<词条原文>|<理由>
-allowed() {  # $1=文件 $2=词条 → 0=已登记豁免
-  [ -f "$ALLOW_FILE" ] || return 1
-  local base g p r
-  base="$(basename "$1")"
+ALLOW_G=(); ALLOW_P=()
+if [ -f "$ALLOW_FILE" ]; then
   while IFS='|' read -r g p r; do
     case "${g:-}" in ''|\#*) continue ;; esac
-    # shellcheck disable=SC2254  —— glob 需展开，不能加引号
-    case "$base" in $g) ;; *) continue ;; esac
-    [ "$p" = "$2" ] && return 0
+    ALLOW_G+=("$g"); ALLOW_P+=("${p:-}")
   done < "$ALLOW_FILE"
-  return 1
-}
+fi
 
-# 该文件是否有豁免登记（有 → 跳过快速路径，确保每条命中都过豁免判定）
-has_allow() {
-  [ -f "$ALLOW_FILE" ] || return 1
-  local base g p r
-  base="$(basename "$1")"
-  while IFS='|' read -r g p r; do
-    case "${g:-}" in ''|\#*) continue ;; esac
-    case "$base" in $g) return 0 ;; esac
-  done < "$ALLOW_FILE"
+allowed() {  # $1=文件 $2=词条 → 0=已登记豁免
+  local base i; base="$(basename "$1")"
+  for ((i=0; i<${#ALLOW_G[@]}; i++)); do
+    # shellcheck disable=SC2254  —— glob 需展开，不能加引号
+    case "$base" in ${ALLOW_G[$i]}) ;; *) continue ;; esac
+    [ "${ALLOW_P[$i]}" = "$2" ] && return 0
+  done
   return 1
 }
 
 for f in $FILES; do
   scanned=$((scanned+1))
-  # 快速路径：合并 pattern 一次判空（grep -f 即多模式 OR）
-  if ! has_allow "$f"; then
-    if ! grep -qiEf "$PATFILE" "$f" 2>/dev/null; then
-      skipped=$((skipped+1)); continue
-    fi
+  # 快速路径：合并 pattern 一次判空（grep -f 即多模式 OR）。
+  # 零命中 → 既没有要报的，也没有要过豁免判定的，直接跳过。
+  if ! grep -qiEf "$PATFILE" "$f" 2>/dev/null; then
+    skipped=$((skipped+1)); continue
   fi
-  # 慢速路径：确有命中的文件，逐条精确报出是哪个词条
+  # 慢速路径：确有命中的文件，逐条精确报出是哪个词条。
+  # 每个词条只调一次 grep，结果复用（原先是「判空 + 输出」各调一次）。
   for p in "${PATTERNS[@]}"; do
-    if grep -niE "$p" "$f" >/dev/null 2>&1; then
-      if allowed "$f" "$p"; then
-        waived=$((waived+1))
-        echo "  ⚪ 已豁免: ${p} @ ${f}（见 preflight_allow.txt）"
-        continue
-      fi
-      hit "$p 命中: $f"
-      grep -niE "$p" "$f" 2>/dev/null | head -2
+    out=$(grep -niE "$p" "$f" 2>/dev/null) || continue
+    if allowed "$f" "$p"; then
+      waived=$((waived+1))
+      echo "  ⚪ 已豁免: ${p} @ ${f}（见 preflight_allow.txt）"
+      continue
     fi
+    hit "$p 命中: $f"
+    printf '%s\n' "$out" | head -2
   done
 done
 echo "  （扫描 $scanned 个文件；快速路径跳过 $skipped 个；豁免 $waived 条）"

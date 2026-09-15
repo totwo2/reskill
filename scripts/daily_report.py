@@ -310,6 +310,13 @@ def main():
 
     cfg = parse_config(CONFIG)
     sh_token, sh_handle = load_skillhub_creds()
+    # 凭据缺失必须响亮：否则 SkillHub 段会静默为空，看起来像「没变化」，实际是「取不到」。
+    if not sh_token or not sh_handle:
+        print("⚠️  SkillHub 凭据不可用 —— 本日 SkillHub 段数据为空，这不代表「没有变化」。")
+        print(f"    期望位置: {SKILLHUB_CREDS}")
+        print("    缺失项: " + ("token " if not sh_token else "") + ("handle" if not sh_handle else ""))
+        print("    格式: {\"user\": {\"token\": \"<token>\", \"handle\": \"<handle>\"}}，文件权限 600。")
+        print("    （GitHub 段不受影响，走 gh 钥匙串。）")
     gh_owner = cfg.get("github", {}).get("owner")
     gh_repos = [r.get("name") for r in cfg.get("github", {}).get("repos", []) if r.get("name")]
     sh_slugs = [s.get("slug") for s in cfg.get("skillhub", {}).get("skills", []) if s.get("slug")]
