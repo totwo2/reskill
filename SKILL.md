@@ -1,7 +1,13 @@
 ---
 name: reskill
 slug: reskill
-version: 3.3.0
+version: 3.4.0
+kind: feature
+# kind 决定 README 前 30 行按哪套判据（闸门 preflight_quality_check.py）：
+#   perf    优化类 —— 收益本身是数字，必须给量化佐证（selfopt / no-bb 属此类）
+#   feature 功能类 —— 以前没有这能力，无基线可比，写「它自动替你做了什么」
+# reskill 是功能类：它把「人肉发版」这件事自动化，没有可对照的性能基线，
+# 硬编一个「效率提升 X%」反而违反本项目自己的「数字必须可复算」。
 displayName: Skill发布质量闸门与反馈系统
 description: |
   发 skill 之前先审代码：第三方审计代理对照需求查覆盖/超纲/幻觉，再过质量闸门——
@@ -50,6 +56,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | "审代码" / "这代码真的实现了吗" / "有没有超纲" | **publish-code-audit.md** → 覆盖表 / 超纲表 / 幻觉表 |
 | "检查发布物质量" / "这 README 行不行" | publish-quality.md → 双维度打分 |
 | "能不能被搜到" / "topics 怎么写" / "可发现性" | scripts/check_discoverability.py → 量每个 topic 的真实搜索池 + 名称查重 |
+| "该写数字还是写功能" / "这项目算哪类" | **看有没有基线**：有（改前 vs 改后）= `perf`，必须给数字；没有（以前根本没这能力）= `feature`，写「它自动替你做了什么」。声明在 SKILL.md 的 `kind:`，闸门按它选判据 |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查 GitHub issues + SkillHub 数据 |
 | "下载量" / "下载趋势" / "有没有新下载" | scripts/check_downloads.py → 对比快照+增量提醒 |
 | "同步skill列表" / "查名下skill" | scripts/fetch_my_skills.py → 拉取名下skill+对比本地 |
@@ -102,6 +109,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | 名下skill同步 | scripts/fetch_my_skills.py | 同步SkillHub官方API名下的skill列表 |
 | 发布前扫描 | scripts/preflight_publish_check.sh | 凭据 + 个人痕迹 + 结构，综合闸门 |
 | 可发现性 | scripts/check_discoverability.py | 量每个 topic 的真实搜索池（低于下限=没人搜）+ 名称查重。需联网 |
+| **发布物质量闸门** | **scripts/preflight_quality_check.py** | **前 30 行收益陈述按 `kind` 分判据：perf 优化类要量化数字 / feature 功能类要「自动替你做了什么」；未声明只给 WARN** |
 
 ---
 

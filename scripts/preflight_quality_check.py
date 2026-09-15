@@ -94,11 +94,47 @@ MATH_PATTERNS = [
     r"证明过程", r"符号检验", r"中位数加速比",
 ]
 
-# 数字收益正则（README 前 30 行必须有）
+# ---------------------------------------------------------------------------
+# 前 30 行的「收益陈述」——按项目类型分两套判据
+#
+#   优化类 perf ：产物是「对已有东西的改进」（更快/更省/更准）。
+#                 有基线可比 → 收益本身就是数字，必须给量化佐证，
+#                 否则读者无法判断提升有多少。例：selfopt「1.5x faster」。
+#
+#   功能类 feature：产物是「以前没有的能力」（自动做某件事）。
+#                 没有基线 → 编数字就是造假，该写的是「它自动替你做了什么」。
+#                 例：reskill「8 个环节自己走完，你只说一句话」。
+#
+#   怎么分：**这个收益，是跟一个可对照的基线比出来的吗？**
+#     有基线（改前 vs 改后 / A 方案 vs B 方案）→ perf
+#     没有基线（以前根本没这能力）           → feature
+#
+# 2026-09-15 修正：原先只有 NUMBER_RE 一条判据，对功能类项目必然误判
+# （要么逼它编数字，要么永远 FAIL）。规范 publish-quality.md 第 93 行
+# 本就写了三种形态「省多少 / 快多少 / **少几步**」，而 NUMBER_RE 只能抓前两种，
+# 第三种全漏 —— 这是实现跟不上规范，不是文档不合格。
+# ---------------------------------------------------------------------------
+
+# 优化类：数字收益（省 / 快 / 准，含「少几步」的对比形态）
+# 2026-09-15：原正则只认 % / 倍 / x / "N.Ns →" / "N/N →"，
+# 规范第 93 行写的第三种「少几步」几乎全漏（`8 个环节 → 1 条命令` 抓不到）。
+# 补成「数字(+单位/中文前缀) → 数字」的通用对比形态。
 NUMBER_RE = re.compile(
-    r"(\d+\s*%|\d+\s*倍|\d+\s*x\b|\d+\.\d+\s*s\s*→|\d+\s*/\s*\d+\s*→|-\d+\s*%)",
+    r"(\d+\s*%|\d+\s*倍|\d+\s*x\b|-\d+\s*%"
+    r"|\d+(?:\.\d+)?(?:\s*/\s*\d+)?\s*(?:s|ms|秒|分钟|步|条|个|件事|处)?"
+    r"[\u4e00-\u9fa5]{0,4}\s*(?:→|->)\s*\d+)",
     re.IGNORECASE,
 )
+
+# 功能类：自动化声明（这东西自动替你做掉了什么）
+CAPABILITY_RE = re.compile(
+    r"(交给它|交给你|替你|自带|一键|一条命令|一个命令|一句话|不用你|无需你|"
+    r"免去|省掉|自己走完|自己跑完|自己完成|自动(?:化|地|帮你|替你|走完|跑完|"
+    r"完成|收集|发布|生成|审|检查|处理|同步|上传|下载|转写|归档)|全自动)",
+    re.IGNORECASE,
+)
+
+KINDS = ("perf", "feature")
 
 MIN_TOPICS = 10          # GitHub 侧 topics 下限（publish-quality.md：15~20，10 为及格线）
 README_HEAD_LINES = 30   # "前 30 行有数字" 的判定窗口
@@ -189,18 +225,41 @@ def detect_bilingual_mirror(text):
 # GitHub profile
 # =============================================================================
 
-def check_github(text, topics, description, r: Result):
+def check_github(text, topics, description, r: Result, kind=None):
     if text is None:
         r.add("FAIL", "README 存在", "找不到 README.md —— GitHub 主页没有入口")
         return
 
-    # 1. 前 30 行有数字收益
+    # 1. 前 30 行的收益陈述 —— 按项目类型选判据（见文件头 KINDS 说明）
     head = "\n".join(text.splitlines()[:README_HEAD_LINES])
-    if NUMBER_RE.search(head):
-        r.add("PASS", f"前 {README_HEAD_LINES} 行有数字", "收益可量化")
+    num = NUMBER_RE.search(head)
+    cap = CAPABILITY_RE.search(head)
+    label = f"前 {README_HEAD_LINES} 行有收益陈述"
+
+    if kind == "perf":
+        if num:
+            r.add("PASS", label, f"优化类，量化佐证在：「{num.group(0).strip()}」")
+        else:
+            r.add("FAIL", label,
+                  "优化类必须有数字佐证（省/快多少，且说清跟什么基线比）——"
+                  "% / 倍 / x / 耗时对比 一个都没有")
+    elif kind == "feature":
+        if cap:
+            r.add("PASS", label, f"功能类，自动化声明在：「{cap.group(0).strip()}」")
+        else:
+            r.add("FAIL", label,
+                  "功能类不该编数字，但必须说清它自动替你做了什么事"
+                  "（读前 30 行看不出它替你干了啥）")
+    elif num:
+        r.add("PASS", label, f"量化收益：「{num.group(0).strip()}」")
+    elif cap:
+        r.add("WARN", label,
+              f"读到自动化声明「{cap.group(0).strip()}」但无数字 —— 像是功能类。"
+              "功能类请在 SKILL.md 声明 kind: feature 后复跑（perf 需补数字）")
     else:
-        r.add("FAIL", f"前 {README_HEAD_LINES} 行有数字",
-              "没有 %、倍、x、耗时对比等可量化收益（selfopt 式：原理开篇）")
+        r.add("FAIL", label,
+              "既无量化数字、也无自动化声明（selfopt 式：原理开篇赶客）。"
+              "优化类写数字，功能类写「它自动替你做了什么」")
 
     # 2. 中英逐段对照
     mirror = detect_bilingual_mirror(text)
@@ -213,8 +272,14 @@ def check_github(text, topics, description, r: Result):
     # 3. 钩子是否打动人 —— 脚本判不了，交裁判
     r.add("LLM评", "钩子（3 秒测试）", "第一屏是不是在说'用户被什么扎着'？需裁判 LLM 或人工判")
 
-    # 4. 数字是否可信 —— 脚本判不了
-    r.add("LLM评", "数字可复算", "收益数字能不能复算？不许'显著提升'。需人工/裁判判")
+    # 4. 收益是否可信 —— 脚本判不了，交裁判。判据同样按类型分：
+    #    优化类问「数字能不能复算」，功能类问「替你做的事能不能指认」。
+    if kind == "feature":
+        r.add("LLM评", "做的事可指认",
+              "它替你做的事，是不是你本来得亲手做的那几件？"
+              "列不出来 = 不合适。需裁判 LLM 或人工判")
+    else:
+        r.add("LLM评", "数字可复算", "收益数字能不能复算？不许'显著提升'。需人工/裁判判")
 
     # 5. topics
     if topics is None:
@@ -337,11 +402,29 @@ def render(name, r: Result):
     return 0 if not r.failed else 1
 
 
-def run_check(dirpath, platform, topics=None, description=None, label=None):
+def read_kind(dirpath):
+    """项目类型：读 SKILL.md frontmatter 的 kind:，取不到返回 None。
+
+    不写 kind 也能跑（按未声明处理，见 check_github 的兜底分支）；
+    写了才享受该类的严格判据。声明即承诺，别两类都想要。
+    """
+    txt = read_text(os.path.join(dirpath, "SKILL.md"))
+    if not txt:
+        return None
+    m = re.search(r"^kind:\s*([A-Za-z]+)\s*$", txt, re.MULTILINE)
+    if not m:
+        return None
+    v = m.group(1).strip().lower()
+    return v if v in KINDS else None
+
+
+def run_check(dirpath, platform, topics=None, description=None, label=None, kind=None):
+    if kind is None:
+        kind = read_kind(dirpath)
     if platform == "github":
         text = read_text(os.path.join(dirpath, "README.md"))
         r = Result()
-        check_github(text, topics, description, r)
+        check_github(text, topics, description, r, kind=kind)
     elif platform == "skillhub":
         text = read_text(os.path.join(dirpath, "SKILL.md"))
         r = Result()
@@ -371,7 +454,7 @@ def run_test():
 - 性能：配对交替测量 + 中位数加速比 + 符号检验（sign test）
 """
     r = Result()
-    check_github(bad_gh, "", None, r)
+    check_github(bad_gh, "", None, r, kind="perf")
     ok &= _assert("坏样本 GitHub 应判 FAIL", r.failed)
 
     # --- 用例 2：好样本 GitHub（有数字、单语、topics 两组词齐全）
@@ -381,7 +464,7 @@ def run_test():
 | ⏱ 响应时间 | 60.8s → 32.1s |
 """
     r = Result()
-    check_github(good_gh, "ai,llm,token-optimization,latency,cost-optimization,python,proxy,middleware,reasoning,inference", None, r)
+    check_github(good_gh, "ai,llm,token-optimization,latency,cost-optimization,python,proxy,middleware,reasoning,inference", None, r, kind="perf")
     ok &= _assert("好样本 GitHub 应判 PASS", not r.failed)
 
     # --- 用例 3：坏样本 SkillHub（无 description、用法在后、有开发日志+数学）
@@ -415,6 +498,54 @@ description: 帮你省 token 的工具。触发词：省 token、收敛、减少
     check_skillhub(good_sh, None, r)
     ok &= _assert("好样本 SkillHub 应判 PASS", not r.failed)
 
+    # --- 以下 4 项验证「按类型分判据」这件事本身判得对不对（2026-09-15 新增）
+    #     老高裁决：优化类必须给数字佐证；功能类本就无基线可比，
+    #     硬要数字 = 逼它造假，该写的是「它自动替你做了什么」。
+    TOP10 = "automation,productivity,python,cli,devops,quality,tools,workflow,release,audit"
+
+    # --- 用例 5：功能类好样本（无数字，但说清自动做了什么）→ 应 PASS
+    good_feat = """# reskill — 发版前先审代码，发版后自动收反馈
+> 代码写完、测试过了，剩下的事交给它：审代码、写文档、发双平台、收反馈。
+## 它解决什么
+- README 写得像开发日志，陌生人扫 3 秒就走。
+"""
+    r = Result()
+    check_github(good_feat, TOP10, None, r, kind="feature")
+    ok &= _assert("功能类好样本（有自动化声明，无数字）应判 PASS", not r.failed)
+
+    # --- 用例 6：功能类坏样本（通篇原理架构，没说替你做什么）→ 应 FAIL
+    bad_feat = """# mytool
+> 基于分层架构与可插拔设计，采用事件驱动模型。
+## 设计原理
+三层解耦，注册表驱动，便于扩展。
+"""
+    r = Result()
+    check_github(bad_feat, TOP10, None, r, kind="feature")
+    ok &= _assert("功能类坏样本（无自动化声明）应判 FAIL", r.failed)
+
+    # --- 用例 7：优化类里出现「自动」不算数，缺数字仍须 FAIL
+    perf_no_num = """# fastthing
+> 全自动加速你的代码，自动优化每处热点。
+## 原理
+配对交替测量 + 符号检验。
+"""
+    r = Result()
+    check_github(perf_no_num, TOP10, None, r, kind="perf")
+    ok &= _assert("优化类缺数字应判 FAIL（不受功能类词干扰）", r.failed)
+
+    # --- 用例 8：未声明类型 + 读到自动化声明 → WARN，不误伤为 FAIL
+    r = Result()
+    check_github(good_feat, TOP10, None, r)
+    ok &= _assert("未声明类型 + 有自动化声明 应判 WARN（不 FAIL）", not r.failed)
+
+    # --- 用例 9：规范第 93 行的「少几步」必须被认作量化收益（补漏点）
+    compress = """# tool
+> 把 8 个环节 → 1 条命令。
+"""
+    r = Result()
+    check_github(compress, TOP10, None, r, kind="perf")
+    ok &= _assert("「8 个环节 → 1 条命令」应被认作量化收益", not r.failed)
+
     print("\n" + "=" * 72)
     print("  ✅ 全部自检通过 —— 规则判定逻辑正确" if ok else "  ❌ 自检未全通过 —— 规则有问题，别用")
     print("=" * 72)
@@ -444,6 +575,11 @@ def main():
     ap.add_argument("--effect-words",
                     help="追加效果作用词（逗号分隔），补在默认表之后；领域不同时用它覆盖，"
                          "例如发布工具关心省事/少出错，而不是 token/latency")
+    ap.add_argument("--kind", choices=list(KINDS),
+                    help="项目类型，决定前 30 行按哪套判据："
+                         "perf=优化类（收益是数字，必须给量化佐证）/ "
+                         "feature=功能类（无基线，写它自动替你做了什么）。"
+                         "不传则读 SKILL.md frontmatter 的 kind:")
     ap.add_argument("--test", action="store_true", help="自检：验证规则本身判得对不对")
     args = ap.parse_args()
 
@@ -460,7 +596,8 @@ def main():
         print(f"ERROR: 目录不存在: {args.dir}", file=sys.stderr)
         return 2
 
-    return run_check(args.dir, args.platform, args.topics, args.description)
+    return run_check(args.dir, args.platform, args.topics, args.description,
+                     kind=args.kind)
 
 
 if __name__ == "__main__":
