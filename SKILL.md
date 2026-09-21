@@ -1,7 +1,7 @@
 ---
 name: reskill
 slug: reskill
-version: 3.5.0
+version: 3.5.1
 kind: feature
 # kind 决定 README 前 30 行按哪套判据（闸门 preflight_quality_check.py）：
 #   perf    优化类 —— 收益本身是数字，必须给量化佐证（selfopt / no-bb 属此类）
