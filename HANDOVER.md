@@ -136,6 +136,27 @@ bash scripts/preflight_secret_scan.sh . --all
   - `.gitignore` 本身（skillhub 不接受该文件类型）
 - 发布后再移回
 
+**SkillHub CLI 发布（2026-09-18 实测走通，quibbler v1.1.1）**：
+官方文档 `skillhub.cn/tutorials#publish-via-cli`。**CLI 直接收文件夹（非 zip），`pack_skillhub.sh` 不再需要写。**
+
+```bash
+# 1. 安装（一次）
+curl -fsSL https://skillhub.cn/install/install.sh | bash -s -- --cli-only   # → ~/.local/bin/skillhub
+# 2. 登录（token = ~/.skillhub/credentials.json 里的 skh_…）
+skillhub login --key <token> --host https://api.skillhub.cn
+skillhub auth whoami                                   # 核对 handle 与条目归属一致
+# 3. 发布文件夹 = SKILL.md 在根 + 全部 skill 内容（+ README 双语）
+skillhub publish <文件夹> --dry-run                     # 本地预检，几秒出结果
+skillhub publish <文件夹> --changelog "本次变更说明"      # 正式发布
+```
+
+- **拒收文件类型**：`LICENSE`（实测 400「不允许的文件类型」）与 `.gitignore` —— 打包时剔除；
+  许可由 `SKILL.md` frontmatter `license:` 声明即可。
+- **更新 = 同 slug + 升 version + 换 changelog**，流程与首发布完全一致。
+- 发布成功返回 `skillId=…`，状态 pending_review；**线上搜索/详情页滞后是正常态**
+  （FAQ Q6：审核通过自动可见），不要当失败重发。
+- 线上版本号用读接口核：`GET https://api.skillhub.cn/api/v1/search?q=<slug>`（Bearer token）。
+
 ### 4.2 反馈收集（feedback-collector.md）
 
 **流程**：

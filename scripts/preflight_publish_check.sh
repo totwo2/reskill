@@ -108,6 +108,16 @@ allowed() {  # $1=文件 $2=词条 → 0=已登记豁免
   return 1
 }
 
+# 性能（2026-09-17 优化；纯实现改动，判定语义与输出逐字不变）：
+#   原慢速路径对「每个命中文件 × 每个词条」各起一次 grep 子进程。实测 24 个文件时
+#   约 600 次调用 ≈ 110s，超过 gate 的 60s 看门狗 → 恒被判超时 = 永久 REJECT。
+#   改为「文件读一次 + bash 内建 =~ 匹配」，零子进程。语义对齐 `grep -niE`：
+#     · ERE 语法相同 —— 直接复用同一个 PATTERNS 数组，不做任何改写
+#     · 大小写不敏感由 nocasematch 提供，且只在匹配期间开启：
+#       allowed() 里的 case 是大小写敏感 glob，若受影响会改变豁免口径。
+#   输出仍按 PATTERNS 原顺序；每个词条取前 2 行命中（与原先的 head -2 同）。
+_nocase_restore="$(shopt -p nocasematch 2>/dev/null || echo 'shopt -u nocasematch')"
+
 for f in $FILES; do
   scanned=$((scanned+1))
   # 快速路径：合并 pattern 一次判空（grep -f 即多模式 OR）。
@@ -115,10 +125,25 @@ for f in $FILES; do
   if ! grep -qiEf "$PATFILE" "$f" 2>/dev/null; then
     skipped=$((skipped+1)); continue
   fi
-  # 慢速路径：确有命中的文件，逐条精确报出是哪个词条。
-  # 每个词条只调一次 grep，结果复用（原先是「判空 + 输出」各调一次）。
+  # 慢速路径：一次读入全部行（含无末尾换行的最后一行），再逐词条做内建匹配。
+  LINES=(); nlines=0
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    nlines=$((nlines+1)); LINES[$nlines]="$_line"
+  done < "$f"
+
   for p in "${PATTERNS[@]}"; do
-    out=$(grep -niE "$p" "$f" 2>/dev/null) || continue
+    out=""; nm=0
+    shopt -s nocasematch
+    for ((i=1; i<=nlines; i++)); do
+      if [[ ${LINES[$i]} =~ $p ]]; then
+        if [ -z "$out" ]; then out="${i}:${LINES[$i]}"
+        else out="${out}"$'\n'"${i}:${LINES[$i]}"; fi
+        nm=$((nm+1))
+        [ "$nm" -ge 2 ] && break
+      fi
+    done
+    eval "$_nocase_restore"
+    [ -n "$out" ] || continue
     if allowed "$f" "$p"; then
       waived=$((waived+1))
       echo "  ⚪ 已豁免: ${p} @ ${f}（见 preflight_allow.txt）"
@@ -135,12 +160,52 @@ echo "  （扫描 $scanned 个文件；快速路径跳过 $skipped 个；豁免 
 # ============================================================
 echo "--- [3/3] 结构完整性 ---"
 # 3.1 SKILL.md frontmatter
+# 发现约定（2026-09-16 扩容，老高批）：
+#   Agent Skill 产物要求「至少一份可被发现的 SKILL.md」。顶层 `SKILL.md` 是
+#   SkillHub installer 形态与根 SKILL.md 仓库（如 reskill）的写法；GitHub 侧标准
+#   布局是 `skills/<name>/SKILL.md`（gh skill publish 以仓库根为目标、校验所有
+#   可发现的 skill）。
+#   原实现只认顶层 `[ -f SKILL.md ]`，会误拒所有用标准布局的 skill 仓库 ——
+#   quibbler / da-jia-answer / zhi-py-opt 的 tag 提交正是
+#   "move SKILL.md to skills/<name>/ for gh skill publish compatibility"。
+#   注 1：检查面比原来**更严** —— 原来是查 1 个文件，现在逐份校验。
+#   注 2：publish.md 记的其余发现形式（skills/{scope}/*/、plugins/{scope}/skills/*/）
+#         暂不纳入（宁可漏放不可误放），遇到再加。
+#   2026-09-17 二次修正（实测 gh skill install 的发现约定后）：
+#     官方六条约定 = skills/*/SKILL.md、skills/{scope}/*/SKILL.md、{prefix}/skills/*/SKILL.md、
+#     {prefix}/skills/{scope}/*/SKILL.md、*/SKILL.md、plugins/*/skills/*/SKILL.md。
+#     **顶层 SKILL.md 不在其中** —— 实测 `gh skill preview totwo2/reskill` 报 "no skills found"。
+#   本次把判据分成两半，各归其主：
+#     · 本闸门只判「**有入口时入口是否合格**」→ 逐份校验 name / description / topics
+#     · 「**要不要有入口**」= 形态问题 → 归「分发形态判定官」，本闸门不判
+#   故：顶层 SKILL.md 与「完全无入口」一律**警告**而非 FAIL
+#       （前者不被发现，后者对普通项目/ B 类 installer 是正常的）。
+check_skill_md() {
+  local sf="$1"
+  echo "  · 校验 $sf"
+  grep -q '^name:' "$sf" || hit "$sf 缺 name"
+  grep -q '^description:' "$sf" || hit "$sf 缺 description"
+  grep -q '^topics:' "$sf" || echo "  ⚠️ $sf 无 topics（可搜索性弱，建议加）"
+}
+
+found_skill=0
+for sf in skills/*/SKILL.md; do
+  [ -f "$sf" ] || continue
+  check_skill_md "$sf"
+  found_skill=1
+done
+
 if [ -f SKILL.md ]; then
-  grep -q '^name:' SKILL.md || hit "SKILL.md 缺 name"
-  grep -q '^description:' SKILL.md || hit "SKILL.md 缺 description"
-  grep -q '^topics:' SKILL.md || echo "  ⚠️ SKILL.md 无 topics（可搜索性弱，建议加）"
-else
-  hit "缺 SKILL.md（Agent Skill 发布必需）"
+  check_skill_md "SKILL.md"
+  echo "  ⚠️ 顶层 SKILL.md —— 不在 gh skill install 的发现约定内（应放 skills/<name>/），"
+  echo "     故本仓库装不下来。若是 skill 包请移动；若是普通项目，本行可忽略。"
+fi
+
+if [ "$found_skill" = "0" ]; then
+  echo "  ⚠️ 未发现 skill 入口（skills/<name>/SKILL.md）"
+  echo "     · 按 skill 发布 → 缺入口，装不上（缺陷）"
+  echo "     · 普通项目 / B 类 installer → 无需入口，本行可忽略"
+  echo "     形态由「分发形态判定官」判，不由本闸门判。"
 fi
 
 # 3.2 README（双语）

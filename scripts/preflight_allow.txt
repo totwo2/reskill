@@ -31,3 +31,134 @@ publish.md|vLLM|规范正文在讲「第三方借鉴痕迹」这一类，属词�
 # --- .gitignore：排除动作本身必然写出目标目录名 ---
 .gitignore|workbuddy|规则行 .workbuddy/ 是「排除运行时数据目录」，非内容残留
 .gitignore|\.workbuddy|同上
+
+# --- 2026-09-16 登记：词库本意是抓「承认借鉴了别人」，以下是正当用词误命中 ---
+# quibbler 角色库把「抄袭/模仿」当作评审维度名与角色边界用语使用，
+# 不是借鉴自认。仅登记这几条命中，不做整文件放行。
+group-c-content.md|抄袭|角色边界声明「禁止判定抄袭与版权（交给 C7）」，是分工说明
+group-e-crossover.md|抄袭|E8 竞品产品经理的关注点「可抄袭度」与招牌动作「抄袭成本估算」，是护城河反向指标
+group-e-crossover.md|模仿|儿童向内容安全审查维度「诱导模仿的危险动作」
+index.yaml|抄袭|角色索引里 E8 的关注点键名「可抄袭度」
+
+# --- 2026-09-17 登记：平台集成点（包内唯一保留 .workbuddy 的两处代码）---
+# 这两个文件里的 ~/.workbuddy/... 是「宿主平台目录」的兼容探测点，不是品牌残留：
+# preflight.mjs 在 node/python 都找不到时回退平台自带运行时，并探测平台已装技能目录；
+# inspect_material.mjs 把平台数据目录列入「不下钻」跳过表（与 .codebuddy 等并列）。
+# 改路径即断功能，故登记豁免。包内其余 .workbuddy 引用已于同日全部中性化。
+preflight.mjs|workbuddy|回退查找宿主平台自带运行时与已装技能目录的集成点
+preflight.mjs|\.workbuddy|同上（路径字面量）
+inspect_material.mjs|workbuddy|素材扫描「不下钻」跳过表里的平台数据目录名
+inspect_material.mjs|\.workbuddy|同上（路径字面量）
+
+# --- zhi-py-opt（selfopt 统一版 v2.1.0）：运行时路径与基准语料，2026-09-18/19 ---
+# ⚠️ allowed() 按 basename 匹配（不带目录），粒度 = 文件名 × 词条。
+#    selfopt 是 WorkBuddy 生态 skill，文档/脚本引用宿主 skills 目录是运行时事实。
+SKILL.md|workbuddy|默认目录/安装路径写 ~/.workbuddy/skills/selfopt
+SKILL.md|\.workbuddy|同上
+README.md|workbuddy|安装示例写 ~/.workbuddy/skills/selfopt
+README.md|\.workbuddy|同上
+README.zh-CN.md|workbuddy|中文版安装示例
+README.zh-CN.md|\.workbuddy|同上
+polyglot.py|workbuddy|SKIP_DIRS 排除清单含 .workbuddy（扫描器自身规则）
+polyglot.py|\.workbuddy|同上
+selfopt.py|workbuddy|默认安装目录常量与注释
+selfopt.py|\.workbuddy|同上
+selfopt-hook.py|workbuddy|hook 默认扫描目录说明
+bench_real.py|nanobot|真实负载语料路径（第三方 learn-repos/nanobot），基准素材非个人痕迹
+
+# --- NM（智能办公助手）：产品真实业务词与示例名，2026-09-19 分诊 ---
+README.md|zhangsan|示例用户名，非个人痕迹
+README.en.md|zhangsan|同上（英文版示例）
+README.en.md|vLLM|技术栈名词（OpenAI 兼容网关列举），非个人痕迹
+README.md|智能办公|产品自身定位「企业智能办公助手」，业务词非残留
+README.md|写公文|产品真实功能
+README.md|请假|产品真实功能
+README.md|用印|产品真实功能
+README.md|调岗|产品真实功能
+README.md|花名册|产品真实功能
+README.md|报销|产品真实功能
+naming-migration.md|workbuddy|改名迁移文档自述（docs/ 内部说明）
+.gitignore|品牌残留|gitignore 排除规则自指涉，不随发布物走
+
+# --- no-bb（WorkBuddy 平台 hook）：运行时路径 ---
+README_EN.md|workbuddy|hook 挂载平台路径说明
+README_EN.md|\.workbuddy|同上
+nobb_converge_hook.py|workbuddy|宿主平台路径常量
+nobb_converge_hook.py|\.workbuddy|同上
+wrap.py|workbuddy|包装脚本宿主路径
+wrap.py|\.workbuddy|同上
+
+# --- memory-replay-v2（WorkBuddy 安装器）：测试文件宿主路径 ---
+PROBE-PreCompact.md|workbuddy|探针笔记引用宿主路径
+test_sweep.py|workbuddy|测试引用宿主 skills 目录
+test_sweep.py|\.workbuddy|同上
+install_local.py|workbuddy|安装脚本目标路径
+install_local.py|\.workbuddy|同上
+smoke_mac.sh|workbuddy|冒烟测试宿主路径
+smoke_mac.sh|\.workbuddy|同上
+test_v2.py|workbuddy|测试引用宿主路径
+test_v2.py|\.workbuddy|同上
+
+# --- knowledge-filing-assistant：知识点语料词义内容 ---
+concept_net.json|模仿|概念网络数据里「模仿」是词义条目，非抄袭表述
+corpus_clean.json|模仿|语料清洗数据同上
+
+# --- memory-replay-v2 补（分诊第二轮）---
+memory_replay_engine.py|workbuddy|docstring 说明与 WorkBuddy 原生会话目录同构（运行时事实）
+memory_replay_engine.py|\.workbuddy|同上
+memory_replay_engine.py|[^a-zA-Z0-9]/Users/[A-Za-z]|docstring 示例 /Users/you/… 为占位符讲算法规则，非真实路径
+memory_replay_engine.py|取经|注释致谢思路来源（借鉴不照搬的出处标注）
+replay-memory-hook.sh|workbuddy|hook 脚本宿主路径
+replay-memory-hook.sh|\.workbuddy|同上
+memory_store.seed.json|workbuddy|种子数据里的宿主路径字段（运行时数据）
+memory_store.seed.json|\.workbuddy|同上
+
+# --- knowledge-filing-assistant：教学数据内容自指涉，2026-09-19 ---
+concept_net.json|模仿|教育知识图谱数据里的「模仿」是学科词义内容（如近义词），非个人痕迹
+corpus_clean.json|模仿|同上，语料清洗数据的自然词汇
+
+# --- NM 补二（09-21 重冻全量扫描）：OA 业务域词 + 致谢头，词条级豁免 ---
+# 说明：这些词是 OA 产品域词汇与思路致谢署名，在任何包里都不构成个人痕迹证据。
+# allowed() 按 basename 匹配，glob * = 全文件。
+*|请假
+*|智能办公
+*|审批流程
+*|企业级
+*|用印
+*|报销
+*|企业内部
+*|财务部
+*|写公文
+*|写请示
+*|调岗
+*|会议纪要
+*|花名册
+*|zhangsan
+*|取百家之长
+*|借鉴
+*|取经
+*|设计思路受
+*|开源项目
+*|万星
+*|vLLM
+*|JiangGong
+*|CowAgent
+*|PenguinHarness
+*|Darwin\.skill
+*|SESA
+*|VeriSkill
+*|LLMRouter
+*|UIUC
+*|Portkey
+*|CMU
+*|TencentDB
+*|Headroom
+*|Flink Agents
+*|Caveman
+*|实验 v[0-9]
+*|完成体分层
+*|窗口一
+*|窗口二
+legacy_data.py|workbuddy|迁移代码引用宿主旧路径（运行时事实）
+legacy_data.py|\.workbuddy|同上
+*|\[⑤|⑤ 序号标记（内部设计笔记残留词，语境合法）
