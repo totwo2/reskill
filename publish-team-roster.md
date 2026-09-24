@@ -266,7 +266,7 @@ reskill 也在 GitHub 上 —— **这不是新决策，是同一条规则的执
 
 | # | 现状 |
 |---|---|
-| **Q11** | 已攒下 **3 处偏差**：① `tag v1.4.0` 快照没有 `README_EN.md`（main 已有）② 平台侧 SKILL.md 缺 `license`/`homepage` 两行 ③ SkillHub 侧 README 落后。<br>**另有两项也在等这个决定**：reskill 本地 7 处未提交改动；SkillHub 上 reskill 停在 2.0.5 |
+| **Q11** | **✅ 已全部收口（2026-09-24）**：① `README_EN.md` 已随提交入轨（旧 v1.4.0 tag 不动）② SKILL.md frontmatter 已补 `license: MIT` + `homepage` ③ SkillHub README 随重发消除。<br>reskill 本地 7 处未提交 → 已提交 `342b19f`；**SkillHub 已重发 2.0.5 → 3.5.1（skillId 87149 / versionId 373687，内容+安全审核 pending）**。<br>⚠️ **GitHub push 阻塞**：沙箱代理对 `github.com` 持续 502（gitlab.cn/skillhub.cn 正常），`git push origin master` 暂未成功，本地提交安全，待网络恢复后续推。 |
 
 **版本节奏已立规矩**（`publish.md:317-319`）：不要发现一个发一个版，攒够一批一起发；
 发现偏差先记 `release_history` 的 `pending` 段，只有 P0 才当场发。
@@ -1027,4 +1027,16 @@ README/README_EN 目录树（prompts/requirement-brief.md + scripts/verify_brief
 - 另：reskill 本地未提交改动 + SkillHub 卡 2.0.5 一并处理（见提交与发布步骤）。
 
 **README/README_EN 同步**：目录树 + 自检清单（新增 crosscheck 5 项 + criteria_hash 5 项）+ 总数 178→**188**。
+
+### 7.32 发布落地 + GitHub 推送阻塞（2026-09-24）
+
+**SkillHub 发布（✅ 成功）**：`skillhub publish` 干净副本 `.publish-staging/pack/reskill` → 版本 **3.5.1**，slug `reskill`，skillId `87149`，versionId `373687`，fileCount `68`。
+- 干净副本由 `scripts/pack_skillhub.sh . --json` 生成（剔除 `.publish-staging`、本地基线等），含 README_EN.md + 带 license/homepage 的 SKILL.md。
+- 内容审核 / 安全扫描状态 `pending`（平台常规排队，非失败）。**本次发布解决"SkillHub 卡 2.0.5"挂起项。**
+
+**本地提交（✅ 安全）**：全部 25 文件已提交 `342b19f`（`feat: 补齐发布闸门链……`），working tree clean。
+
+**GitHub push（⚠️ 阻塞，非我方可控）**：沙箱代理 `http://127.0.0.1:51942` 对 `github.com` 的 CONNECT 隧道持续返回 `502 Bad Gateway`（gitlab.com 301、api.skillhub.cn 成功），直连 github.com 超时（沙箱禁直连）。重试 5 次均 502，判定为基础设施问题而非瞬断，停止空打。
+- **边界**：本地提交已落盘、SkillHub 已发布，工作零丢失；仅远端 `origin/master` 同步未成。待代理恢复对 github.com 的路由后，一条 `git push origin master` 即可补齐（无冲突风险，仅 fast-forward 1 个提交）。
+- 不把它写成"失败"——它只是"未联网完成"，且对发布物质量无影响。
 
