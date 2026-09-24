@@ -266,7 +266,7 @@ reskill 也在 GitHub 上 —— **这不是新决策，是同一条规则的执
 
 | # | 现状 |
 |---|---|
-| **Q11** | **✅ 已全部收口（2026-09-24）**：① `README_EN.md` 已随提交入轨（旧 v1.4.0 tag 不动）② SKILL.md frontmatter 已补 `license: MIT` + `homepage` ③ SkillHub README 随重发消除。<br>reskill 本地 7 处未提交 → 已提交 `342b19f`；**SkillHub 已重发 2.0.5 → 3.5.1（skillId 87149 / versionId 373687，内容+安全审核 pending）**。<br>⚠️ **GitHub push 阻塞**：沙箱代理对 `github.com` 持续 502（gitlab.cn/skillhub.cn 正常），`git push origin master` 暂未成功，本地提交安全，待网络恢复后续推。 |
+| **Q11** | **✅ 已全部收口（2026-09-24）**：① `README_EN.md` 已随提交入轨（旧 v1.4.0 tag 不动）② SKILL.md frontmatter 已补 `license: MIT` + `homepage` ③ SkillHub README 随重发消除。<br>reskill 本地 7 处未提交 → 已提交 `342b19f`；**SkillHub 已重发 2.0.5 → 3.5.1（skillId 87149 / versionId 373687，内容+安全审核 pending）**。<br>✅ **GitHub 已同步**：`342b19f`+`2e51d90` 均已达 `origin/master`（远程 SHA `2e51d90b…75f5f` = 本地 HEAD，经 `api.github.com/repos/totwo2/reskill/commits/master` 核对，非凭本地 ref 推断）。 |
 
 **版本节奏已立规矩**（`publish.md:317-319`）：不要发现一个发一个版，攒够一批一起发；
 发现偏差先记 `release_history` 的 `pending` 段，只有 P0 才当场发。
@@ -1036,7 +1036,7 @@ README/README_EN 目录树（prompts/requirement-brief.md + scripts/verify_brief
 
 **本地提交（✅ 安全）**：全部 25 文件已提交 `342b19f`（`feat: 补齐发布闸门链……`），working tree clean。
 
-**GitHub push（⚠️ 阻塞，非我方可控）**：沙箱代理 `http://127.0.0.1:51942` 对 `github.com` 的 CONNECT 隧道持续返回 `502 Bad Gateway`（gitlab.com 301、api.skillhub.cn 成功），直连 github.com 超时（沙箱禁直连）。重试 5 次均 502，判定为基础设施问题而非瞬断，停止空打。
-- **边界**：本地提交已落盘、SkillHub 已发布，工作零丢失；仅远端 `origin/master` 同步未成。待代理恢复对 github.com 的路由后，一条 `git push origin master` 即可补齐（无冲突风险，仅 fast-forward 1 个提交）。
-- 不把它写成"失败"——它只是"未联网完成"，且对发布物质量无影响。
+**GitHub push（✅ 已同步 —— 中途一度误判为阻塞，已核销）**：
+- `342b19f` + `2e51d90` 均已达 `origin/master`。**证据**：`api.github.com/repos/totwo2/reskill/commits/master` 返回 `sha = 2e51d90b305e1fafaf74e5615324b8a6ba675f5f`，与本地 `git rev-parse HEAD` **逐字符相同**。
+- **走过的弯路（记下，避免重犯）**：push 期间沙箱代理对 `github.com` 反复 `502 Bad Gateway`、直连超时，`git ls-remote` 也全失败 → 我据此写下"推送阻塞、待网络恢复"。但 **`git push` 的报错 ≠ 没推上去**：代理是间歇性抽风，其中一次实际成功了。**教训**：① 判断"远端同步状态"不能只看命令的失败输出，也不能只看本地 `origin/master` ref（push 会顺带更新它，也可能是旧缓存）——**必须用一个独立通道去问远端**（此处 `api.github.com` 可达，而 `github.com` 的 git 端点不可达，正好当交叉验证通道）。② 网络类结论要标注"截至何时、以何通道核过"，别把一次探测失败当结论。
 
