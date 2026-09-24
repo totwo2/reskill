@@ -231,11 +231,19 @@ def cmd_test(_args=None):
               "description: 把重复劳动干掉。触发词：批量处理、导出报表、定时任务、"
               "数据清洗、自动跑\n---\n\n# demo-tool\n\n## 用法\n\n跑。\n\n## 原理\n\n后讲。\n")
         write(os.path.join(p, "README.md"),
-              "# demo-tool\n\n给你的一条命令，把重复劳动干掉。"
+              "# demo-tool\n\n[English](README_EN.md) | 简体中文\n\n"
+              "给你的一条命令，把重复劳动干掉。"
               "装上就能用，实测单次处理 500 条只要 3 秒。\n\n"
               "## 安装\n\n```\npip install demo-tool\n```\n\n"
               "## 用法\n\n```\ndemo-tool run --input data.csv\n```\n\n"
               "## 为什么\n\n原理放后面。\n")
+        # GitHub 侧必须中英双语（分文件）—— 2026-09-23 起是硬要求，fixture 要跟上
+        write(os.path.join(p, "README_EN.md"),
+              "# demo-tool\n\nEnglish | [简体中文](README.md)\n\n"
+              "One command that kills repetitive work. Install it and it just runs; "
+              "measured at 3 seconds for 500 rows.\n\n"
+              "## Install\n\n```\npip install demo-tool\n```\n\n"
+              "## Usage\n\n```\ndemo-tool run --input data.csv\n```\n")
         write(os.path.join(p, pf.STAGING, "fact-sheet.md"),
               "# 事实表\n\n- 2024 年市场规模 128 亿元（来源：工信部 2024-03-15）\n"
               "- 头部份额 41.2%（出处：行业研报 2025-01-08）\n")
@@ -258,15 +266,15 @@ def cmd_test(_args=None):
               "rc=%s" % rc2)
         check("停在 N4 且给出回填路径",
               r2.get("awaiting_verdict") == "N4"
-              and r2["reply_to"].endswith(os.path.join("verdicts", "N4.json")),
+              and (r2.get("reply_to") or "").endswith(os.path.join("verdicts", "N4.json")),
               str(r2.get("awaiting_verdict")))
-        check("任务单落盘", os.path.exists(r2["task_file"]), r2.get("task_file", ""))
+        check("任务单落盘", os.path.exists(r2.get("task_file") or ""), str(r2.get("task_file")))
         check("已判的机器节点落了账",
-              [row["node"] for row in r2["trace"]] == ["N0", "N1", "N2", "N3"],
-              str([row["node"] for row in r2["trace"]]))
+              [row.get("node") for row in (r2.get("trace") or [])] == ["N0", "N1", "N2", "N3"],
+              str([row.get("node") for row in (r2.get("trace") or [])]))
         check("停下不消耗重试次数",
-              pf.load_state(p)["attempts"] == {},
-              str(pf.load_state(p)["attempts"]))
+              (pf.load_state(p).get("attempts") or {}) == {},
+              str(pf.load_state(p).get("attempts")))
 
         # 3) 回卷 → 继续推进，逐节点走到终态
         seen = []
@@ -274,9 +282,9 @@ def cmd_test(_args=None):
         guard = 0
         while rc == EXIT_AWAITING and guard < 10:
             guard += 1
-            node = r2["awaiting_verdict"] if guard == 1 else r["awaiting_verdict"]
+            node = r2.get("awaiting_verdict") if guard == 1 else r.get("awaiting_verdict")
             seen.append(node)
-            write(r2["reply_to"] if guard == 1 else r["reply_to"],
+            write((r2.get("reply_to") if guard == 1 else r.get("reply_to")) or "",
                   json.dumps({"score": 4.5, "judge": "reader-%s" % node.lower(),
                               "reason": "依任务单判：%s" % node}, ensure_ascii=False))
             rc, r = step(p)
@@ -286,9 +294,9 @@ def cmd_test(_args=None):
               rc == EXIT_TERMINAL and r.get("state") == "released",
               "rc=%s state=%s" % (rc, r.get("state")))
         check("账本 8 行、8 行都有署名",
-              len(r["ledger"]) == len(pf.NODES)
-              and all(x["judge"] for x in r["ledger"]),
-              "%d 行" % len(r["ledger"]))
+              len(r.get("ledger") or []) == len(pf.NODES)
+              and all(x.get("judge") for x in (r.get("ledger") or [])),
+              "%d 行" % len(r.get("ledger") or []))
 
         # 4) 终态后再调 → 仍是 0，不重复推进
         rc4, r4 = step(p)
@@ -302,8 +310,8 @@ def cmd_test(_args=None):
             cmd_report(argparse.Namespace(project=p))
         rep = json.loads(buf.getvalue())
         check("report 列出判定者与分数下限",
-              "reader-n4" in rep["judges"] and rep["rows"] == len(pf.NODES),
-              str(rep["judges"]))
+              "reader-n4" in (rep.get("judges") or []) and rep.get("rows") == len(pf.NODES),
+              str(rep.get("judges")))
 
         # 6) 判定缺署名 → 不予采信，不推进
         p2 = os.path.join(tmp, "proj2")
@@ -311,7 +319,11 @@ def cmd_test(_args=None):
         write(os.path.join(p2, "SKILL.md"),
               "---\nname: d\ndescription: 触发词：a、b、c、d、e\n---\n\n## 用法\n\n跑。\n")
         write(os.path.join(p2, "README.md"),
-              "# d\n\n给你的一条命令，装上就能用，实测 500 条 3 秒。\n\n## 用法\n\n```\nd\n```\n")
+              "# d\n\n[English](README_EN.md) | 简体中文\n\n"
+              "给你的一条命令，装上就能用，实测 500 条 3 秒。\n\n## 用法\n\n```\nd\n```\n")
+        write(os.path.join(p2, "README_EN.md"),
+              "# d\n\nEnglish | [简体中文](README.md)\n\n"
+              "One command, install and run; measured 3 seconds for 500 rows.\n")
         write(os.path.join(p2, pf.STAGING, "fact-sheet.md"),
               "# 事实表\n\n- 2024 年规模 128 亿元（来源：工信部 2024-03-15）\n")
         init(p2)
@@ -321,8 +333,8 @@ def cmd_test(_args=None):
         rc6, r6 = step(p2)
         check("判定未署名 → 原地退回，不吃重试次数",
               rc6 == EXIT_AWAITING and r6.get("invalid_verdict") is True
-              and pf.load_state(p2)["attempts"] == {}
-              and pf.load_state(p2)["node_index"] == 4,
+              and (pf.load_state(p2).get("attempts") or {}) == {}
+              and pf.load_state(p2).get("node_index") == 4,
               "rc=%s r6=%s" % (rc6, str(r6)[:80]))
         check("退回时说明缺什么",
               any("缺 judge" in x for x in (r6.get("problems") or [])),
@@ -334,7 +346,11 @@ def cmd_test(_args=None):
         write(os.path.join(p3, "SKILL.md"),
               "---\nname: d\ndescription: 触发词：a、b、c、d、e\n---\n\n## 用法\n\n跑。\n")
         write(os.path.join(p3, "README.md"),
-              "# d\n\n给你的一条命令，装上就能用，实测 500 条 3 秒。\n\n## 用法\n\n```\nd\n```\n")
+              "# d\n\n[English](README_EN.md) | 简体中文\n\n"
+              "给你的一条命令，装上就能用，实测 500 条 3 秒。\n\n## 用法\n\n```\nd\n```\n")
+        write(os.path.join(p3, "README_EN.md"),
+              "# d\n\nEnglish | [简体中文](README.md)\n\n"
+              "One command, install and run; measured 3 seconds for 500 rows.\n")
         write(os.path.join(p3, pf.STAGING, "fact-sheet.md"),
               "# 事实表\n\n- 2024 年规模 128 亿元（来源：工信部 2024-03-15）\n")
         init(p3)
@@ -346,14 +362,22 @@ def cmd_test(_args=None):
         st7 = pf.load_state(p3)
         check("低分判定 → 计入重试并自动搁置（不发）",
               rc7 == EXIT_TERMINAL and r7.get("state") == "deferred"
-              and st7["attempts"].get("N4") == pf.MAX_ROUNDS,
+              and (st7.get("attempts") or {}).get("N4") == pf.MAX_ROUNDS,
               "rc=%s state=%s attempts=%s" % (rc7, r7.get("state"),
-                                              st7["attempts"]))
+                                              st7.get("attempts")))
         check("搁置也留账本：每条否决都记着谁判的",
-              len([x for x in r7["ledger"]
-                   if x["node"] == "N4" and x["verdict"] == "fail"
-                   and x["judge"] == "reader-1"]) == pf.MAX_ROUNDS,
-              str([(x["node"], x["judge"]) for x in r7["ledger"]]))
+              len([x for x in (r7.get("ledger") or [])
+                   if x.get("node") == "N4" and x.get("verdict") == "fail"
+                   and x.get("judge") == "reader-1"]) == pf.MAX_ROUNDS,
+              str([(x.get("node"), x.get("judge")) for x in (r7.get("ledger") or [])]))
+    except Exception as exc:      # noqa: BLE001
+        # 兜底：自检自己崩了，也必须报成一项 FAIL —— 不能把失败盖成 traceback。
+        # 2026-09-23 教训：`r2["task_file"]` 用下标取键，闸门变化后该键不存在，
+        # 于是抛 KeyError 崩掉，把「首步没停在 N4」这个真失败完全盖住 ——
+        # 一份会崩的自检，比没有自检更糟：它让人以为"没报错就是过了"。
+        results.append(("自检自身未崩溃", False,
+                        "%s: %s（自检代码有 bug，不是被测对象的问题）"
+                        % (type(exc).__name__, exc)))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

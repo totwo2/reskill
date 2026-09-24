@@ -128,16 +128,26 @@ bash scripts/preflight_secret_scan.sh . --all
 - 退出码 1 = 命中凭据，立即中止
 
 **SkillHub 发布特别注意**：
-- skillhub 打包不遵守 `.gitignore`
-- 发布前必须临时移走：
-  - `settings/reskill_config.yaml`
-  - `settings/download_history.yaml`
-  - `settings/feedback_report.md`
-  - `.gitignore` 本身（skillhub 不接受该文件类型）
-- 发布后再移回
+- skillhub 打包**不遵守 `.gitignore`**：它的排除表写死只有 `.git`/`.idea`/`.vscode`/`node_modules`/`__pycache__`
+  ＋ `*.pyc`/`.DS_Store`/`Thumbs.db`（`skills_store_cli.py:2227`）。
+- 所以**不要直接把项目目录丢给 publish** —— 会把 `.publish-staging/`、脚本自测临时目录、
+  `settings/*.yaml` 一起当成正式文件传上去（2026-09-23 everytime-novel 实跑取证）。
+- 解法：**先出干净副本，再发副本**。
+  ```bash
+  bash scripts/pack_skillhub.sh <skill 目录>       # 打印干净副本路径（最后一行）
+  bash scripts/pack_skillhub.sh --test             # 自检 11 项
+  skillhub publish "<副本路径>" --dry-run
+  skillhub publish "<副本路径>" --changelog "本次变更说明"
+  ```
+- **拒收文件类型**：`LICENSE`（实测 400「不允许的文件类型」）与 `.gitignore`
+  —— 打包脚本已自动剔除；许可由 `SKILL.md` frontmatter `license:` 声明即可。
+- ~~旧做法：发布前手工移走 `settings/*.yaml` 与 `.gitignore`，发布后移回。~~
+  **已废弃**：忘移回就是数据丢失，且移的是放凭据的目录。改用上面的一次性干净副本。
 
 **SkillHub CLI 发布（2026-09-18 实测走通，quibbler v1.1.1）**：
-官方文档 `skillhub.cn/tutorials#publish-via-cli`。**CLI 直接收文件夹（非 zip），`pack_skillhub.sh` 不再需要写。**
+官方文档 `skillhub.cn/tutorials#publish-via-cli`。CLI 直接收文件夹（非 zip）——
+但这只解决"能不能传"，不解决"传上去的是什么"；包内杂物仍需 `pack_skillhub.sh` 先清掉。
+（2026-09-23 更正：本条原写"`pack_skillhub.sh` 不再需要写"，是把"CLI 收文件夹"误当成"不用清包"。）
 
 ```bash
 # 1. 安装（一次）
@@ -155,7 +165,47 @@ skillhub publish <文件夹> --changelog "本次变更说明"      # 正式发�
 - **更新 = 同 slug + 升 version + 换 changelog**，流程与首发布完全一致。
 - 发布成功返回 `skillId=…`，状态 pending_review；**线上搜索/详情页滞后是正常态**
   （FAQ Q6：审核通过自动可见），不要当失败重发。
-- 线上版本号用读接口核：`GET https://api.skillhub.cn/api/v1/search?q=<slug>`（Bearer token）。
+- 线上版本号用读接口核：`GET https://api.skillhub.cn/api/v1/skill`（Bearer token）。
+  实测好用的详情接口：`GET https://api.skillhub.cn/api/v1/skills/<slug>` —— 无需 token，
+  能读到 `latestVersion.version` / `skill.tags` / `summary` / `summary_zh` / `changelog`。
+
+### 4.1b GitHub 侧发布：按布局选工具（2026-09-23 实测）
+
+**两个工具互补，不是谁坏了：**
+
+| 仓库布局 | 用哪个 | 证据 |
+|---|---|---|
+| **根级 `SKILL.md`**（如 `totwo2/reskill`） | `scripts/gh_release.py` | reskill 已有 11 个 tag |
+| **`skills/<name>/SKILL.md`**（everytime-novel、quibbler） | **`gh skill publish --tag vX.Y.Z`**（gh 官方预览功能） | everytime-novel 实测通过；quibbler 已有 3 个 tag |
+
+`gh skill publish` 的发现约定：`skills/*/SKILL.md` · `skills/{scope}/*/SKILL.md` ·
+`*/SKILL.md` · `plugins/{scope}/skills/*/SKILL.md`。
+**根级 `SKILL.md` 会验证失败** —— 三样本对照实测：
+
+- 根级 `SKILL.md`（name: A）→ ❌ `error  name "A" does not match directory name "."`
+- `skills/wrong-dir/`（name 不符）→ ❌ `error  name "totally-different" does not match directory name "wrong-dir"`
+- `skills/skill-good/`（合规）→ ✅ `Dry run complete`
+
+**发布动作（注意在仓库根跑，不是 skill 目录）：**
+
+```bash
+cd <仓库根>
+gh skill publish --dry-run                            # 先验，几秒
+gh skill publish --tag vX.Y.Z                         # 建 tag + release（非交互）
+gh release edit vX.Y.Z --title "..." --notes "..."    # 默认说明只有一行 compare 链接，补手写
+```
+
+**两条纪律**：
+
+1. **闸门 `gate check` 对 GitHub 侧要指向仓库根**，对 SkillHub 侧才指向 skill 目录。
+   指错会触发假的「顶层 `SKILL.md` 不在 `skills/<name>/`」告警。
+2. **C3「版本无法比对」在 GitHub 侧是工具局限，不是产物缺陷** —— 闸门按设计不持凭据、不代查远程，
+   看不到远端 tag / release。**不要为消这条告警往仓库塞 CHANGELOG**（四个仓库都没有，这是既有惯例），
+   那等于迎合误报，违反 gate 纪律 3。
+
+> `gh skill publish` 在传目录参数不对时，会报 `name "X" does not match directory name "."` ——
+> 它其实**已经发现到**根级 SKILL.md 了，只是把仓库根当成 skill 目录去比名字。
+> **这是误导性文案，不是"没找到"**（上游修复中：#14259）。
 
 ### 4.2 反馈收集（feedback-collector.md）
 

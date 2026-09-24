@@ -3,6 +3,8 @@ name: reskill
 slug: reskill
 version: 3.5.1
 kind: feature
+license: MIT
+homepage: https://github.com/totwo2/reskill
 # kind 决定 README 前 30 行按哪套判据（闸门 preflight_quality_check.py）：
 #   perf    优化类 —— 收益本身是数字，必须给量化佐证（selfopt / no-bb 属此类）
 #   feature 功能类 —— 以前没有这能力，无基线可比，写「它自动替你做了什么」
@@ -50,17 +52,24 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 
 发布分成三段。**只有第三段可以单独使用**；前两段都是判定，判定不能自评。
 
+> **先分清主体：这三段是「发布闸门专家团」的三段，不是 reskill 的三段。**
+> reskill 是三段**共用的判据库 + 工具箱**——它提供判据（规则文档）、量尺（检查脚本）、执行件（发布脚本），
+> 但它自己**不产出任何发布物**。写简介、写标签、写 README 是第②段写手岗位的活；
+> reskill 只在旁边递尺子（`check_discoverability.py` 量标签有没有人搜），量完报数，不替你写。
+>
+> **团队里具体有哪些专家、各自干什么、拿什么工具，见 `publish-team-roster.md`（角色单一真源）。**
+
 | 段 | 谁 | 用什么 | 判什么 |
 |---|---|---|---|
-| ① 机器判定 | `gate` 命令 | `gate check <目录>` / `gate inbox <目录>`；内部**复用**本 skill 的 `preflight_secret_scan.sh`、`preflight_publish_check.sh` | 硬错：凭据泄漏、个人痕迹、版本打架、topics 异常 |
-| ② 独立评审 | 「发布闸门专家团」`publish-gate-team` | 只读 `gate inbox` 产出的**物料箱** | 软质量：形态判断、简介与标签、README 首屏、文案、跨出口一致性 |
-| ③ 执行发布 | **本 skill 的脚本** | `gh_release.py` / `gh_skill.py` / `local_publish.py` | 不改判据，只按前两段的结论动手 |
+| ① 机器判定 | `gate` 命令 | `gate check <目录>` / `gate inbox <目录>`；内部**复用**本 skill 的 `preflight_secret_scan.sh`、`preflight_publish_check.sh` | 硬错：凭据泄漏、个人痕迹、版本打架、标签格式 |
+| ② 独立评审 | 「发布闸门专家团」`publish-gate-team` | 只读 `gate inbox` 产出的**物料箱**；**产出** README / 简介 / 标签 进暂存区 | 软质量：形态判断、简介与标签、README 首屏、文案、跨出口一致性 |
+| ③ 执行发布 | **本 skill 的脚本 + gh 官方命令** | **SkillHub**：`pack_skillhub.sh` 出干净副本 → `skillhub publish`。**GitHub**：`gh_skill.py` / `local_publish.py` 推文件 → **建 release 按布局选**（`publish.md` §检查清单）：`skills/<name>/` 布局用 `gh skill publish --tag vX.Y.Z`（在**仓库根**跑），根级 `SKILL.md` 布局用 `gh_release.py` | 不改判据，只按前两段的结论动手 |
 
 **三条边界（违反任意一条 = 拆闸门）：**
 
 - **① 不许绕过。** 直接跑 `preflight_*.sh` 而不经 `gate`，等于自己给自己判。`gate` 只是**调用**这些脚本——判据仍在本 skill 里，所以改判据等于同时改闸门，按纪律必须先报批。
 - **② 不许自评。** 本 skill 的 `preflight_quality_check.py` / `quality_metrics.py` 是**作者自查工具**，不能当终审。终审是专家团（独立上下文，陌生人视角）。
-- **③ 是唯一可单独使用的段。** `gate` 只判不放行——它不写 README、不打包、不推 GitHub、不推 SkillHub。最后一米永远是本 skill 的脚本。
+- **③ 是唯一可单独使用的段。** `gate` 只判不放行——它不写 README、不打包、不推 GitHub、不推 SkillHub。最后一米永远是本 skill 的执行件（含 gh 官方命令，如 `gh skill publish`）。
 
 > 一句话：**reskill 是「闸门之后的执行手册 + 判据库」，不是「可以绕过的裁判」。**
 
@@ -81,7 +90,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 | "谁来判" / "这一步好不好谁负责" / "判定派发" | **scripts/verdict_dispatch.py** → 出题（判定任务单）/ 收卷（校验判定合法性） |
 | "审代码" / "这代码真的实现了吗" / "有没有超纲" | **publish-code-audit.md** → 覆盖表 / 超纲表 / 幻觉表 |
 | "检查发布物质量" / "这 README 行不行" | publish-quality.md → 双维度打分 |
-| "能不能被搜到" / "topics 怎么写" / "可发现性" | scripts/check_discoverability.py → 量每个 topic 的真实搜索池 + 名称查重 |
+| "这批标签有没有人搜" / "可发现性" | scripts/check_discoverability.py → **只量**每个标签的真实搜索池 + 名称查重。**写标签是第②段写手岗位的活，本 skill 不产出标签** |
 | "该写数字还是写功能" / "这项目算哪类" | **看有没有基线**：有（改前 vs 改后）= `perf`，必须给数字；没有（以前根本没这能力）= `feature`，写「它自动替你做了什么」。声明在 SKILL.md 的 `kind:`，闸门按它选判据 |
 | "检查反馈" / "有没有issue" / "用户意见" | feedback-collector.md → 检查 GitHub issues + SkillHub 数据 |
 | "下载量" / "下载趋势" / "有没有新下载" | scripts/check_downloads.py → 对比快照+增量提醒 |
@@ -117,6 +126,7 @@ allowed-tools: "Read Write Edit Bash Glob Grep WebFetch WebSearch Skill Agent"
 
 | 模块 | 文件 | 用途 |
 |------|------|------|
+| **团队名册（角色单一真源）** | **publish-team-roster.md** | **谁在场（J1–J4 / E1–E2）+ 各自工具白名单与产出 + 三权分立 + reskill 供给表。改角色只改这一份** |
 | **第三方代码审计** | **publish-code-audit.md** | **源码 vs 需求（覆盖/超纲/幻觉）+ 文档 vs 源码；审计代理定义与硬规则** |
 | **发布物质量** | **publish-quality.md** | **双平台形态三分支 + 元数据 + README/SKILL.md 模板 + 双维度打分** |
 | **专家团队编排** | **publish-expert-team.md** | **闸门不交专家；双平台两线流程（N0–N7）；约束四层；蜂巢适用边界** |

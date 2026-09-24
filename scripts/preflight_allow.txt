@@ -162,3 +162,11 @@ corpus_clean.json|模仿|同上，语料清洗数据的自然词汇
 legacy_data.py|workbuddy|迁移代码引用宿主旧路径（运行时事实）
 legacy_data.py|\.workbuddy|同上
 *|\[⑤|⑤ 序号标记（内部设计笔记残留词，语境合法）
+
+# --- law-case-finder：legal_cli 默认缓存目录（运行时事实，env 可覆盖）---
+legal_cli.py|workbuddy|默认缓存路径 ~/.workbuddy/legal-cache/（运行时事实）
+legal_cli.py|\.workbuddy|同上
+
+# --- reskill：名册里写的 gate 常驻路径（运行时事实，不是个人痕迹）---
+publish-team-roster.md|workbuddy|gate 常驻路径 ~/.workbuddy/publish-gate/（运行时事实）
+publish-team-roster.md|\.workbuddy|同上

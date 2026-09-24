@@ -1,5 +1,7 @@
 # reskill — 发版前先审代码，发版后自动收反馈
 
+[English](README_EN.md) | 简体中文
+
 **当前版本 v3.5.1**
 
 > 代码写完、测试过了，剩下的事交给它：审代码 → 过质量闸门 → 写 README 与 SKILL.md →
@@ -88,6 +90,7 @@ reskill/
 ├── publish-quality.md              # 四道质量闸门 + 形态判定 + 简介标签
 ├── publish-code-audit.md           # 第三方源码审计（覆盖 / 超纲 / 幻觉）
 ├── publish-expert-team.md          # 角色分工与权限边界
+├── publish-team-roster.md          # 角色单一真源（谁在场、干什么）
 ├── publish-flow-control.md         # 状态机与节点表
 ├── publish-llm-gate.md             # 裁判 LLM，含无人值守模式
 ├── feedback-collector.md           # issue 检查与反馈提取
@@ -105,6 +108,17 @@ reskill/
 │   ├── preflight_publish_check.sh  # 发布前检查
 │   ├── preflight_secret_scan.sh    # 凭据扫描
 │   ├── check_discoverability.py    # 可发现性：topic 有没有人搜 + 名称有没有被占
+│   ├── verify_audit_report.py      # 审计表证据完整性（空证据行 / 假锚点 → exit 1）
+│   ├── trace_callchain.py          # 超纲判定：从主入口追调用链，判可达/死代码/存疑
+│   ├── verify_ledger.py            # 判决账本独立性证据：判定理由带锚点/不站作者视角/不互相引用 → exit 1
+│   ├── check_doc_anchors.py       # N4.5 自动化：抽 README 命令/标识符 → 源码找锚点（文档幻觉抓捕）
+│   ├── verify_brief_factsheet.py  # N0.2 结构校验 + 与 fact-sheet 联动校验（R4 非空/原话锚点/R3 硬矛盾 → exit 1）
+│   ├── crosscheck_dual_platform.sh # N3-X 跨平台一致性校验（版本/名称一致；gh/sh 双形态漂移 → exit 1；一句话定位仅 🟡）
+│   ├── verify_criteria_hash.py     # Q5 判据哈希记账 + 变动提示（不硬拦；--strict 才 REJECT）
+│   ├── pack_skillhub.sh            # N6-S 打包：为 SkillHub 出干净副本
+│   ├── prompts/                    # 子代理 prompt 模板（编排层填充后喂给全新实例）
+│   │   ├── auditor.md              # J4 第三方代码审计代理（N0.5 / N4.5）；身份段原样照抄 publish-code-audit.md §一
+│   │   └── requirement-brief.md   # N0.2 需求清单模板（R1–R5 + 与 fact-sheet 联动校验 §）；auditor.md 的 {{REQUIREMENT_BRIEF}}
 │   ├── gh_skill.py                 # GitHub skill 操作
 │   ├── gh_release.py               # Release 与 topics
 │   ├── check_downloads.py          # 下载量追踪
@@ -126,10 +140,18 @@ python3 verdict_dispatch.py --test    # 25 项：任务单必须带证据 / 判�
 python3 quality_metrics.py --test     # 6 项：客观指标能区分好样本与坏样本
 python3 check_discoverability.py --self-test   # 17 项：死词抓得住 / 拿不到数据不误判
 python3 preflight_quality_check.py --test     # 9 项：两类判据分开 / 优化类缺数字必 FAIL / 未声明类型不误伤
+python3 verify_audit_report.py --test  # 13 项：空证据行抓得住 / 假锚点抓得住 / 旧报告不诬告
+python3 trace_callchain.py --test      # 7 项：可达链 / 零引用孤儿判死代码 / 追不到但删不掉判存疑
+python3 verify_ledger.py --test        # 14 项：只查独立性证据（带锚点/不站作者视角/不互相引用）；判定者同名只报 note
+python3 check_doc_anchors.py --test     # 9 项：命令归类查入口 / 标识符 grep / 产出过校验器
+python3 verify_brief_factsheet.py --test # 6 项：R4 空/无原话/缺字段抓得住；R3 硬矛盾 exit 1；覆盖缺口仅 🟡
+python3 verify_criteria_hash.py --test  # 5 项：init 写基线/无变动一致/变动提示不拦/--strict 拦/还原一致
+./crosscheck_dual_platform.sh --test  # 5 项：版本一致/标题含name/首句仅🟡/标题不含name/gh-sh漂移
 ./detect_publish_form.sh --test       # 5 项：四条发布路径判定正确
+./pack_skillhub.sh --test             # 11 项：副本干净 / 正式文件齐全 / 非 skill 拒收
 ```
 
-看到 `结果：N 通过 / 0 失败` 就算通过。合计 **118 项**。
+看到 `结果：N 通过 / 0 失败` 就算通过。合计 **188 项**。
 
 ## 想接自己的执行器
 

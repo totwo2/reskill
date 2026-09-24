@@ -313,6 +313,54 @@ gh skill update <owner>/<repo>
 - [ ] 每个版本有对应 tag + release
 - [ ] 已跑 `gh skill publish --dry-run` 看到 ✅
 - [ ] 已跑 `bash scripts/preflight_secret_scan.sh .` 且退出码 0（硬性前置）
+- [ ] **看过 `gate` 输出的 `[4/4] 语义关实际状态`** —— 确认本次实际档位。
+      **gate 的 PASS 只代表机器关通过**，别把它读成"全流程都过了"（2026-09-23 教训，见名册 §7.21）
+- [ ] **发布后核账**：`python3 scripts/verify_ledger.py <项目>` ——
+      查**独立性证据**（判定理由带锚点 / 不站作者视角 / 不互相引用）；
+      **任一条缺 = 拒收**（exit 1）。判定者只有 1 个主体只报 note（**事实不是缺陷**：
+      同一个大模型扮演不同角色是物理事实，换名字改不了共享盲区；独立性靠输入隔离 + 断锚定，
+      不是靠换署名）。见名册 §7.25 与 §7.26。
+
+### 改了闸门/判据之后必做（2026-09-23 事故）
+
+> **闸门是共享零件：改一处会连带别处的测试。**
+
+**只要动了 `preflight_*.sh` / `preflight_quality_check.py` / `publish_flow.py` 的判据或节点定义，
+就必须跑全量自检，不能只跑"我改过的那几个脚本"的：**
+
+```bash
+cd scripts
+python3 local_publish.py --test          # 15 项
+python3 publish_flow.py --test           # 23 项
+python3 local_executor.py --test         # 18 项
+python3 verdict_dispatch.py --test       # 25 项
+python3 quality_metrics.py --test        # 6 项
+python3 check_discoverability.py --self-test   # 17 项
+python3 preflight_quality_check.py --test      # 9 项
+python3 verify_audit_report.py --test    # 13 项
+python3 trace_callchain.py --test        # 7 项
+python3 verify_ledger.py --test          # 14 项
+python3 check_doc_anchors.py --test     # 9 项
+./detect_publish_form.sh --test          # 5 项
+./pack_skillhub.sh --test                # 11 项
+gate selftest                            # 7 项
+```
+
+**为什么**：2026-09-23 把英文镜像从"可选告警"改成 `hit` 硬拦后，
+`local_publish.py --test` 的 fixture 立刻过不了 N3（缺 `README_EN.md`），
+于是连挂 3 轮 → 自动搁置 → 自检拿不到 `task_file` 键 → **抛 KeyError 崩掉**。
+**崩溃把"首步没停在 N4"这个真失败盖住了** —— 一份会崩的自检比没有自检更糟。
+详见名册 §7.23。
+
+### 版本节奏（老高 2026-09-23 定）
+
+> **不要发现一个就发一个版。攒够一批，一起发。**
+
+- **发现偏差 → 先记进 `release_history` 的 `pending` 段**，不要当场顶版本号。
+- 攒到值得发时，**一次发版清掉全部 pending**，changelog 按条列出。
+- **理由**：每顶一次版本号，就多一个要维护的对外快照；零散发版会让"哪个版本修了什么"变得查不清。
+- **例外**：只有 P0（凭据泄漏 / 装不上 / 版本打架）才当场发，其余一律攒。
+
 
 ---
 

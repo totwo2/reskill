@@ -9,6 +9,8 @@
 #   2. 个人痕迹词库：第三方借鉴/品牌残留/实验语境/旧业务场景词/个人绝对路径
 #   3. 结构完整性：SKILL.md frontmatter / README 双语 / MANIFEST 引用存在 /
 #      pytest 配置有效 / 无 .venv 等入库
+#   4. 语义关实际状态：本次走了多少验证（状态机 / 需求蒸馏 / 事实表 / verdicts / ledger）
+#      —— 防「gate 的 PASS 被读成全流程都过了」（2026-09-23 教训）
 set -u
 DIR="."
 for a in "$@"; do
@@ -28,13 +30,13 @@ echo "===== 发布前综合检查: $(pwd) ====="
 # ============================================================
 # 1. 凭据扫描（复用既有闸门）
 # ============================================================
-echo "--- [1/3] 凭据扫描 ---"
+echo "--- [1/4] 凭据扫描 ---"
 bash "$SCRIPT_DIR/preflight_secret_scan.sh" . || FAIL=1
 
 # ============================================================
 # 2. 个人痕迹词库扫描（覆盖源码 + 文档 + 配置）
 # ============================================================
-echo "--- [2/3] 个人痕迹词库 ---"
+echo "--- [2/4] 个人痕迹词库 ---"
 ALLOW_FILE="$SCRIPT_DIR/preflight_allow.txt"
 
 if git rev-parse --git-dir >/dev/null 2>&1; then
@@ -158,7 +160,7 @@ echo "  （扫描 $scanned 个文件；快速路径跳过 $skipped 个；豁免 
 # ============================================================
 # 3. 结构完整性
 # ============================================================
-echo "--- [3/3] 结构完整性 ---"
+echo "--- [3/4] 结构完整性 ---"
 # 3.1 SKILL.md frontmatter
 # 发现约定（2026-09-16 扩容，老高批）：
 #   Agent Skill 产物要求「至少一份可被发现的 SKILL.md」。顶层 `SKILL.md` 是
@@ -208,16 +210,31 @@ if [ "$found_skill" = "0" ]; then
   echo "     形态由「分发形态判定官」判，不由本闸门判。"
 fi
 
-# 3.2 README（双语）
+# 3.2 README（GitHub 侧必须中英双语：分文件 + 顶部互链）
+# 判据：publish-quality.md §二「语言策略」——老高 2026-09-23 定，硬要求不是加分项。
+# 文件名惯例是 README_EN.md（下划线 + 大写 EN，no-bb / quibbler 基准）。
+# 2026-09-23 修：原先只查 README.en.md（点 + 小写），与惯例不符 →
+#               连 no-bb / quibbler 都被误报「无英文镜像」。现在兼容多种变体。
 if [ -f README.md ]; then
-  grep -qE '[A-Za-z]{10,}' README.md || echo "  ⚠️ README.md 纯中文，无英文段（gh 侧建议双语）"
-  if ! grep -qE '[一-鿿]' README.md; then
-    echo "  ⚠️ README.md 纯英文，建议中英并排"
+  EN=""
+  for cand in README_EN.md README.en.md README_en.md README-EN.md; do
+    [ -f "$cand" ] && EN="$cand" && break
+  done
+  if [ -z "$EN" ]; then
+    hit "缺英文镜像 README_EN.md —— GitHub 侧必须中英双语（分文件，主文档保持单语）"
+  else
+    grep -qE 'README[._-][Ee][Nn]' README.md \
+      || echo "  ⚠️ README.md 顶部缺指向英文镜像的互链（照 no-bb：[English]($EN) | 简体中文）"
+    grep -qE 'README\.md' "$EN" \
+      || echo "  ⚠️ $EN 顶部缺指回中文主文档的互链（照 no-bb：English | [简体中文](README.md)）"
+    grep -qE '([A-Za-z]{2,}[[:space:]]+){3,}[A-Za-z]{2,}' "$EN" \
+      || echo "  ⚠️ $EN 里没有成句英文 —— 英文镜像疑似空壳"
+    grep -qE '[一-鿿]' README.md \
+      || echo "  ⚠️ README.md 里没有中文 —— 主文档应为中文单语"
   fi
 else
   hit "缺 README.md"
 fi
-[ -f README.en.md ] || echo "  ⚠️ 无 README.en.md（英文镜像，可选）"
 
 # 3.3 MANIFEST.in 引用文件存在
 if [ -f MANIFEST.in ]; then
@@ -242,6 +259,58 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   if git ls-files 2>/dev/null | grep -qE '(^|/)\.venv/|__pycache__|\.pyc$'; then
     hit ".venv/__pycache__/pyc 已入库，需清理"
   fi
+fi
+
+# ============================================================
+# 4. 语义关实际状态：本次到底走了多少验证（gate 不判质量，只报事实）
+# ============================================================
+# 为什么必须有这一段（2026-09-23 everytime-novel 实跑教训）：
+#   gate 的 PASS 只代表「机器关通过」，**不代表语义关跑过**。
+#   那次实跑 gate 给了 PASS，但暂存区里只有 form.json 和 pack/ ——
+#   没有需求蒸馏、没有事实表、没有 verdicts/、没有 ledger.jsonl，
+#   状态机甚至从未 init（publish_flow.py status 报「尚未 init」）。
+#   也就是说：那次发布**只过了机器关，语义关是"在对话里跑的"，没落盘**。
+#   这一段把这件事显式报出来，防止 PASS 被读成"全流程都过了"。
+echo "--- [4/4] 语义关实际状态（gate 不判质量，只报事实）---"
+
+STAGING=".publish-staging"
+sem_missing=0
+report_art() {   # $1=标签  $2=相对路径
+  if [ -e "$STAGING/$2" ]; then
+    printf '  ✅ %s：有\n' "$1"
+  else
+    printf '  ·  %s：缺\n' "$1"
+    sem_missing=$((sem_missing+1))
+  fi
+}
+
+if [ -d "$STAGING" ]; then
+  report_art "状态机 init（.publish-state.json）" ".publish-state.json"
+  report_art "需求蒸馏（requirement-brief.md）"   "requirement-brief.md"
+  report_art "事实表（fact-sheet.md）"             "fact-sheet.md"
+  report_art "独立判定落盘（verdicts/）"           "verdicts"
+  report_art "判决账本（ledger.jsonl）"            "ledger.jsonl"
+
+  # ⚠️ 这里**故意不设 hit**（2026-09-23 修正）：
+  #   曾加过一条「状态机已 init 但 verdicts/ 为空 → 自相矛盾」的硬拦，
+  #   结果在正常中间态上假阳性 —— 状态机先跑完机器节点 N0–N3，才轮到 N4 建 verdicts/，
+  #   所以"init 了但还没有 verdicts"是**合法中间态**，不是矛盾。
+  #   而且 deferred 也可能纯粹由机器节点连挂 3 轮造成（此时确实没有 verdicts）。
+  #   → 从产物本身推不出"声称跑过却没判定"这个结论，**所以只报不拦**。
+  #   这一段的价值是"把事实说出口"，不是"拦住" —— 别再加 hit。
+
+  if [ "$sem_missing" -ge 4 ]; then
+    echo "  → 本次实际档位：最低档（只有机器关 + 打包 + 发布）"
+    echo "  ⚠️  gate 的 PASS 只代表「机器关通过」，不代表语义关跑过。别把两者混为一谈。"
+  elif [ "$sem_missing" -eq 0 ]; then
+    echo "  → 本次实际档位：全链（语义关产物齐全）"
+  else
+    echo "  → 本次实际档位：降档（语义关产物缺 $sem_missing 项）"
+    echo "  （注：状态机跑到一半时 verdicts/ 尚不存在，属正常中间态，不是异常）"
+  fi
+else
+  echo "  ·  无 .publish-staging/ —— 未走发布链"
+  echo "  → 本次实际档位：链外（普通项目，或首次发布尚未起链）"
 fi
 
 # ============================================================

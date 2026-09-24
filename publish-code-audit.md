@@ -313,8 +313,22 @@ N5 装配 → N6 发布 → N7 收口
 
 ## 八、待实现
 
-- [ ] 审计代理的 prompt 模板（`.publish-staging/prompts/auditor.md`），身份段原样照抄 §一
-- [ ] `scripts/verify_audit_report.py` —— 校验证据完整性（锚点列空 / 无验证命令 → exit 1）
-- [ ] `scripts/trace_callchain.py` —— 表 B 的调用链自动追（从符号 grep 到主入口，输出可达/不可达）
-- [ ] `scripts/check_doc_anchors.py` —— N4.5 自动化：抽 README 里的 ```bash 代码块 + 反引号标识符 → 逐条实跑 / grep
-- [ ] `.publish-staging/requirement-brief.md` 模板 + 与 fact-sheet.md 的联动校验（两条纸对不上 → 拒绝签字）
+- [x] 审计代理的 prompt 模板（`skills/reskill/prompts/auditor.md`，编排层复制到 `.publish-staging/prompts/auditor.md` 后填充）。**2026-09-23 实现**：身份段/工具白名单/三条禁区原样照抄 §一；输出表头严格对齐 `verify_audit_report.py` 契约（code 三表头含「需求+锚点」「追调用链」「检查项」；docs 表头含「文档里写的」）；内嵌独立性纪律（带锚点/不站作者视角/不引用别的判定）满足 `verify_ledger.py` 痕迹要求。已用模板表头造样本跑校验器，双 PASS（版本对齐告警正确触发）
+- [x] `scripts/verify_audit_report.py` —— 校验证据完整性（锚点列空 / 无验证命令 → exit 1）。**2026-09-23 实现，自检 13/13**
+  - 除"格子空不空"，还**核对锚点是否真能解析**（`文件:行号` 存在 + 行号不越界）
+  - **版本对齐**：报告抬头写了 `@ <commit>` 时与当前 HEAD 比对；
+    不一致 → 锚点对不上只报 ⚠️ **不判造假**（审计后代码正常演进，2026-09-23 selfopt 实证）
+- [x] `scripts/trace_callchain.py` —— 表 B 的调用链自动追（从符号 grep 到主入口，输出可达/不可达）。**2026-09-23 实现，自检 7/7**
+  - **grep 级文件可达性，不是 AST** —— 与本节 §三 表 B 给的 grep 方法同粒度
+  - 三种判定对齐表 B：`reachable`（🟢 必要超纲，补登记）/ `dead`（🔴 零外部引用，加戏）/ `uncertain`（⚪ 追不到但删不掉，交人）
+  - **查不出结论时说 `uncertain`，不猜**（缺证据不得放行）
+- [x] `scripts/check_doc_anchors.py` —— N4.5 自动化：抽 README 里的 ```bash 代码块 + 反引号标识符 → 逐条 grep/ls 找锚点。**2026-09-24 实现，自检 9/9**：命令按 `python -m X`/`pip install X`/`python X.py`/`./X` 归类查入口存在；标识符按 函数名/文件名/模块路径 归类 grep；`--run` 才真跑（默认仅校验入口存在，安全）；产出报告表头对齐 `verify_audit_report.py` 的 kind=docs 契约，已用真实项目 selfopt 验证（全 PASS，并抓出 `str-join` 无 def 交人）。
+- [x] **`prompts/requirement-brief.md` 模板 + `scripts/verify_brief_factsheet.py` 联动校验**。**2026-09-24 实现**：模板固化 R1–R5 结构 + 三条硬规则（原话原则/否决区必填/人工确认）+ 与 fact-sheet 的联动校验 §（R2↔能力清单 / R3↔禁用词 / R4↔未出现，逐条对应打勾）；脚本做两类校验——①结构（机器可靠，对应 N0.2 准出 / `.publish-state.json` 的 `has_quotes`+`rejected_section_nonempty`：R4 非空、≥1 处 `「」` 原话锚点）②联动（R3 作为能力出现在事实表 → 🔴 硬矛盾 exit 1 拒绝签字；覆盖缺口/禁区未登记/否决泄漏 → 🟡 交人眼）。自检 6/6。**Two papers must align before N1 sign-off.**
+
+> **J4 审计代理的配置至此补齐**：两个配套脚本（Q14，`verify_audit_report.py` 13/13 + `trace_callchain.py` 7/7）
+> 给了机器件兜底；**prompt 模板（本文件 §八 第一项，2026-09-23 做成）** 把"怎么拉起这个代理、产什么格式"也固化了；
+> **`check_doc_anchors.py`（2026-09-24 做成，9/9）** 把 N4.5 的"文档每个命令/标识符逐条找锚点"也脚本化了；
+> **`requirement-brief.md` 模板 + `verify_brief_factsheet.py`（2026-09-24 做成，6/6）** 把 N0.2 蒸馏产物标准化、
+> 并让"事实表 vs 需求清单两张纸对得上"有了机器辅助。
+> 空证据行、假锚点、死代码、文档幻觉、需求清单废案当需求、两张纸对不上，从此既有脚本校验、又有可复用的执行模板与自动化，不再只靠人眼。
+> **J4 审计链（N0.2 蒸馏 → N0.5 源码审计 → N4.5 文档审计）至此全部配齐。**

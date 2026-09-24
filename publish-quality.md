@@ -172,9 +172,30 @@
 
 ### 语言策略
 
-- **GitHub**：英文为主（国际受众），但开头钩子可以保留中文版块。
-- **SkillHub**：中文为主。
-- **不要中英逐段对照**（selfopt 教训）。要双语就用 `README_EN.md` 分文件（no-bb 做法），主页保持单语干净。
+**GitHub 侧必须中英双语 —— 这是硬要求，不是"加分项"**（老高 2026-09-23 定）。
+
+- **形态**：**分文件**。`README.md`（中文主文档，保持单语干净）+ `README_EN.md`（英文镜像）。
+  两份文档**顶部必须互链**，格式照 no-bb / quibbler：
+
+  ```markdown
+  # 中文标题
+  [English](README_EN.md) | 简体中文
+  ```
+  ```markdown
+  # English title
+  English | [简体中文](README.md)
+  ```
+
+- **文件名统一 `README_EN.md`**（下划线 + 大写 EN）。
+  ⚠️ 闸门 `preflight_publish_check.sh` 原先查的是 `README.en.md`（点 + 小写），
+  与惯例不符 → 连 no-bb / quibbler 都会被误报「无英文镜像」。**2026-09-23 已修**（兼容多种变体，主推 `README_EN.md`）。
+- **不要中英逐段对照**（selfopt 教训：阅读双倍疲劳）。
+  主文档里**不放整段英文**——英文归 `README_EN.md`。要双语就分文件，**不能两个都要**。
+- **SkillHub**：中文为主（`SKILL.md` 单语即可，不需要英文镜像）。
+
+**为什么是硬要求**：J2（国际读者评委）按平台身份评 GitHub 侧 ——
+GitHub 上的真实访客包含国际开发者，**纯中文 README 对他们等于没有主页**。
+这不是"扣几分"的问题，是**东西根本没递到人手上**。
 
 ---
 

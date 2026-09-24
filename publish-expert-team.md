@@ -53,17 +53,23 @@
 
 ## 二、角色配置与工具白名单
 
-| 角色 | 允许工具 | 禁止 | 产出 |
-|---|---|---|---|
-| **挑刺用户** | `Read` `Glob` `Grep` | `Write` `Edit` `Bash` | 一段评价文本（不改任何文件） |
-| **用户视角写手** | `Read`（限功能说明，禁读源码实现）+ `Write`（**仅限暂存区**） | `Edit`（项目文件）`Bash` | 暂存区草稿：README / description / topics |
-| **发布执行者** | `Bash`（限脚本白名单） | `Write` `Edit` | 发布结果三行 |
-| **第三方代码审计** | `Read` `Glob` `Grep` `Bash`（**限只读命令**） | `Write` `Edit` | `audit-code.md` / `audit-docs.md`（三张表，逐条带锚点） |
+> ⚠️ **角色与工具白名单的单一真源已移到 `publish-team-roster.md`。**
+> 本节原先定义 4 个角色，与 `publish-llm-gate.md`（裁判 2 个）、`publish-code-audit.md`（审计 1 个）
+> 三处重复定义、互相打架（2026-09-23 规整记录见名册 §五）。
+> **改角色、改权限，只改名册那一份，本文件不再重复。**
 
-> **第三方代码审计为什么给 Bash**（详见 `publish-code-audit.md` §一）：
-> "这函数存不存在"读是读不出来的，**必须真调一下**。
-> 只给只读三件套，它最后只能写"看起来是实现的"——退化成包装审查，白设这一关。
-> 所以禁 `Write`/`Edit` 保证它改不了，给只读 `Bash` 保证它**验得了**。
+**名册速览（详见 `publish-team-roster.md` §一）：**
+
+| 编号 | 角色 | 一句话职责 | 归属文件 |
+|---|---|---|---|
+| **J1** | 流程裁判 | 执行对不对（四问） | `publish-llm-gate.md` |
+| **J2 / J3** | 质量裁判 ×2 身份 | 产物好不好（会不会下载 / 能不能照着干） | `publish-quality.md` §五 |
+| **J4** | 第三方代码审计 | 代码是不是真的（唯一检查这个前提的） | `publish-code-audit.md` |
+| **E1** | 用户视角写手 | 写两线包装（README / SKILL.md / description / tags / topics） | `publish-quality.md` |
+| **E2** | 发布执行者 | 跑发布命令 | `publish.md` |
+
+**主 agent 的权限以 `publish-llm-gate.md` §六之二为准：只剩 `Bash`（限 `publish_flow.py`）+ `Agent`，
+不给 `Read` / `Write` / `Edit`。**（本节此前写的"唯一有完整权限"已作废。）
 
 ### 落地要点
 
@@ -151,20 +157,22 @@ GitHub 什么形态都能发，SkillHub 只收 skill——但"能发"的范围�
 
 ```
 【共享段】
-  N0   形态判定        主 agent + 脚本      决定：gh 发什么 / sh 发什么 / 是否双发
-  N0.2 需求蒸馏        主 agent + 老高      聊天记录 → requirement-brief.md（带原话+已否决区）
+  N-1  方向三问        老高                搜哪个词 / 被什么扎着 / 跟你发过的区别（答不出不发）
+  N0   形态判定        脚本（主 agent 只调） 决定：gh 发什么 / sh 发什么 / 是否双发
+  N0.2 需求蒸馏        执行子 agent + 老高  聊天记录 → requirement-brief.md（带原话 + 已否决区）
   N0.5 第三方审计①     只读子 agent         源码 vs 需求：覆盖 / 超纲 / 幻觉（逐条带锚点）
        ↑ 不过 → 改代码 或 改需求（老高定）。这一关不过不许往下走
   N1   事实表 + 需求清单一起签字
-                      主 agent 起草 → 老高签字
-                      一句话定位 · 收益数字 · 目标用户 · 禁用词
+                      执行子 agent 起草 → 老高签字
+                      一句话定位 · 收益数字 · 目标用户 · 禁用词 · framing（evidence/block/bound）
                       ↓ 这是两线唯一的内容来源，不许各自发挥
         ┌─────────────┴─────────────┐
 【G 线】                          【S 线】
   N2-G 写 GitHub 包装               N2-S 写 SkillHub 包装
-    README.md（英文为主）             SKILL.md（中文，frontmatter 严格）
-    repo description                 description_zh + 触发词
-    topics（≥10，两组词）             displayName（中文）
+    README.md（中文主文档）           SKILL.md（中文，frontmatter 严格）
+    README_EN.md（英文镜像）          description + 触发词
+    repo description                 displayName（中文）
+    topics（英文，≥10，两组词）        tags（**中文，单行方括号**）
        ↓                                ↓
   N3-G 闸门 G                        N3-S 闸门 S
        └─────────────┬─────────────┘
@@ -173,38 +181,55 @@ GitHub 什么形态都能发，SkillHub 只收 skill——但"能发"的范围�
         同一句话定位？同一组数字？slug↔仓库名可对应？版本号一致？
                      ↓
 【并行挑刺】
-  N4-G 国际开发者身份评 README        N4-S 中文用户身份评 SKILL.md
+  N4-G 国际读者评委评 README          N4-S 中文读者评委评 SKILL.md
                      ↓
-  N4.5 第三方审计②（同一个审计代理，独立第二次拉起）
+  N4.5 第三方审计②（**同身份、新实例** —— 不是"同一代理续跑"，见名册 §7.7）
        文档 vs 源码：README/SKILL.md 里每个命令·入口·数字，都要在源码找得到锚点
        ↑ 防的是"代码没问题、写手编了个不存在的安装方式"（selfopt 事故原型）
                      ↓
 【汇合段】
-  N5   装配（暂存区 → 项目，git diff 可审）
-  N6-S 打包（S 线专属：skill installer 打包，脚本，不看 .gitignore）
-  N6   发布（凭据/痕迹闸门 exit 0 → gh + sh 同版本号）
+  N5   装配（暂存区 → 项目，git diff 可审 —— 给人看）
+  N6-S 打包（出干净副本，脚本 `pack_skillhub.sh`，不看 .gitignore）
+  N6   推文件（凭据/痕迹闸门 exit 0 → 推上远端）
+  N6   建 release（按布局选工具；**在仓库根跑**，见名册 §7.13）
   N7   收口三行：版本 / 链接 / 同步状态
 ```
 
-### 各节点做什么、谁做、怎么约束
+> ⚠️ **本图是速览，不是真源。**
+> **流程真源** = `publish-flow-control.md` §三之二 节点矩阵（准入 / 准出一票否决 / 打回路由）；
+> **角色真源** = `publish-team-roster.md` §三（谁在场 / 向 reskill 取什么）。
+> 图里不重抄这两处的细节 —— **重复必漂**：2026-09-23 本图就漂了 5 处
+> （N0/N0.2/N1 还写"主 agent"、G 线还写"英文为主"、S 线把平台字段写成 `topics`）。
 
-| 节点 | 做什么 | 谁做 | 硬约束 |
-|---|---|---|---|
-| **N0 形态判定** | 决定 gh 发什么 / sh 走三分支哪一种（**A 原样发 / B installer 形态 / C 不发**）/ 是否双发 | 主 agent + 脚本 | 脚本查入口文件 + 体积判据；**"双发"不是默认值，要逐次判定** |
-| **N0.2 需求蒸馏** | 聊天记录 → `requirement-brief.md`（每条带老高原话 + **已否决区**） | 主 agent 抽取 → 老高确认 | 无原话的条目不许写；已否决区不许为空；**跟事实表一起签字，不新增介入点** |
-| **N0.5 源码审计①** | 三张表：覆盖（需求↔锚点）/ 超纲（追调用链到主入口）/ 幻觉（实跑验证存在性） | **只读子 agent（第三方身份）** | 禁 Write/Edit；只读 Bash 白名单；**锚点列空 = 无效判定**；幻觉任一命中一律打回 |
-| **N1 事实表** | 一句话定位 + **收益数字** + 目标用户 + 禁用词（**+ 需求清单一起签**） | 主 agent 起草 → **老高签字** | 数字不许 AI 编；无实测就写"未实测"，禁写"显著提升"；**两张纸必须对得上** |
-| **N2-G** | README（英文为主）+ repo description + topics | 用户视角写手（子 agent） | 禁读源码；产物进暂存区；数字只能引用事实表 |
-| **N2-S** | SKILL.md（中文）+ description_zh + 触发词 + displayName | **同一个写手** | 同上 |
-| **N3-G 闸门** | topics ≥10 且两组词齐全 / README 前 30 行有数字 / 无中英逐段对照 | 主 agent | exit code，不过打回 N2-G，≤3 轮 |
-| **N3-S 闸门** | frontmatter 齐全（slug/displayName/description）/ 有触发词 / 用法在前 1/3 / 无开发日志与数学推导 | 主 agent | exit code，不过打回 N2-S，≤3 轮 |
-| **N3-X 交叉** | 两线定位句同源、核心数字一致、slug↔仓库名可对应、版本号数字一致 | 主 agent | exit code。**这是防"同一个东西两个说法"的唯一关卡** |
-| **N4-G / N4-S** | 两个身份各评一次 | 只读型子 agent ×2（可并行） | 无写权限只评不改；<3 分打回对应线 |
-| **N4.5 文档审计②** | README/SKILL.md 里每条命令、每个入口、每个数字 → 实跑 or grep 找锚点 | **同一审计代理（独立第二次拉起）** | 找不到锚点 = 幻觉 → 打回 N2，≤3 轮 |
-| **N5 装配** | 暂存区 → 项目 | 主 agent | git diff 可审计 |
-| **N6-S 打包** | SkillHub installer 打包（**不看 .gitignore**，实例数据须先移出） | 主 agent 跑脚本 | 打包脚本固定，专家不碰 |
-| **N6 发布** | 凭据 + 个人痕迹双闸门 exit 0 → gh（带 v）+ sh（不带 v）同版本号发布 | 主 agent | 双闸门 exit 0 才发 |
-| **N7 收口** | 输出三行：版本 / 链接 / 同步状态 | 主 agent | 禁输出无 source 的改进建议 |
+### 各节点产出什么、硬约束是什么
+
+> **谁做 → 见 `publish-team-roster.md` §三**（角色单一真源）。
+> **准入 / 准出一票否决 / 打回路由 → 见 `publish-flow-control.md` §三之二 节点矩阵**（流程单一真源）。
+> **本表只写那两处没有的东西：每个节点产出什么、硬约束是什么。**
+>
+> ⚠️ 本表原先还有一列「谁做」，2026-09-23 **删掉** —— 它与名册重复，且已经漂了 5 处：
+> N0.2/N1 还写"主 agent 起草"（主 agent 没有 `Write`）、N5 还写"主 agent `git diff`"
+> （主 agent 没有 `Bash(git)`）、N6 发布没拆三段、N4.5 还写"同一审计代理"（早已定为"同身份、新实例"）。
+> **重复的清单一定会漂，删掉比同步便宜。**
+
+| 节点 | 产出什么 | 硬约束 |
+|---|---|---|
+| **N0 形态判定** | 形态三分支（A 原样发 / B installer 形态 / C 不发）+ 是否双发 | 脚本查入口文件 + 体积判据；**"双发"不是默认值，要逐次判定** |
+| **N0.2 需求蒸馏** | `requirement-brief.md`（每条带老高原话 + **已否决区**） | 无原话的条目不许写；已否决区不许为空；**跟事实表一起签字，不新增介入点** |
+| **N0.5 源码审计①** | 三张表：覆盖（需求↔锚点）/ 超纲（追调用链到主入口）/ 幻觉（实跑验证存在性） | 禁 Write/Edit；只读 Bash 白名单；**锚点列空 = 无效判定**；幻觉任一命中一律打回 |
+| **N1 事实表** | 一句话定位 + **收益数字** + 目标用户 + 禁用词 + **`framing` 字段**（每个数字标 evidence/block/bound） | 数字不许 AI 编；无实测就写"未实测"，禁写"显著提升"；**两张纸（事实表 + 需求清单）必须对得上**；缺 `framing` → 打回 |
+| **N2-G** | README（中文主文档 + `README_EN.md` 英文镜像）+ repo description + topics | 禁读源码；产物进暂存区；数字只能引用事实表 |
+| **N2-S** | SKILL.md（中文）+ description + 触发词 + displayName + `tags`（中文，**单行方括号**） | 同上 |
+| **N3-G 闸门** | exit code | topics ≥10 且两组词齐全 / README 前 30 行有数字 / 无中英逐段对照；不过打回 N2-G，≤3 轮 |
+| **N3-S 闸门** | exit code | frontmatter 齐全 / 有触发词 / 用法在前 1/3 / 无开发日志与数学推导；不过打回 N2-S，≤3 轮 |
+| **N3-X 交叉** | exit code | 两线定位句同源、核心数字一致、slug↔仓库名可对应、版本号数字一致。**防"同一个东西两个说法"的唯一关卡** |
+| **N4-G / N4-S** | 打分（0–5）+ 理由 | 两个身份各评一次、可并行；无写权限只评不改；<3 分打回对应线 |
+| **N4.5 文档审计②** | 锚点表 | 每条命令 / 每个入口 / 每个数字 → 实跑 or grep 找锚点；找不到 = 幻觉 → 打回 N2，≤3 轮 |
+| **N5 装配** | 暂存区 → 项目 | `git diff` 可审计（**给人看** —— 主 agent 没有 `Bash(git)`，见名册 §一之四） |
+| **N6-S 打包** | 干净副本 | **不看 `.gitignore`**（skillhub 打包不看）；实例数据须先移出；专家不碰打包脚本 |
+| **N6 推文件** | 远端提交 | 推上去的内容与本地副本逐字一致 |
+| **N6 建 release** | tag + release | 按布局选工具（`skills/<name>/` → `gh skill publish --tag`；根级 → `gh_release.py`）；**在仓库根跑** |
+| **N7 收口** | 三行：版本 / 链接 / 同步状态 | 禁输出无 source 的改进建议 |
 
 ### 三条设计理由
 
@@ -284,7 +309,7 @@ SkillHub 只收 skill，但可发范围是三分支（详见 `publish-quality.md
 
 ## 五、待实现清单
 
-- [ ] `scripts/publish_flow.py` —— **流程状态机（最大缺口，详见 `publish-flow-control.md`）**
+- [x] `scripts/publish_flow.py` —— **流程状态机**（2026-09-12 已实现，28820B）
   - `start --project --platforms --version`：三参数缺一即报错退出，不许猜、**不许默认双发**
   - `next`：打印当前节点 / 需产出文件 / 准入条件 / 约束
   - `done <节点>`：校验证据文件存在且合规 → 写 `.publish-state.json` → 推进
@@ -297,7 +322,7 @@ SkillHub 只收 skill，但可发范围是三分支（详见 `publish-quality.md
   - **裁判与执行者尽量不同模型**，至少不同角色设定与温度
   - 裁判只看产物，**不看执行者的自我陈述**
   - `.publish-staging/history/` 保留上一版，供"第 3 问（改的是不是被打回的点）"对比
-- [ ] `scripts/detect_publish_form.sh` —— **N0 形态判定**（三分支自动判，输出 A/B/C + 是否双发）
+- [x] `scripts/detect_publish_form.sh` —— **N0 形态判定**（2026-09-12 已实现，5695B；三分支自动判，输出 A/B/C + 是否双发）
   - 有无合规 `SKILL.md`（含 slug/displayName/description）→ A
   - 无 SKILL.md 但源码打包后 ≤ 阈值 且 无重依赖 且 单入口 → B（installer 形态）
   - 其余 → C（sh 不发，只发 gh）
@@ -321,7 +346,17 @@ SkillHub 只收 skill，但可发范围是三分支（详见 `publish-quality.md
 - [ ] `scripts/verify_audit_report.py` —— 审计表证据完整性校验（锚点/验证命令缺失 → exit 1）
 - [ ] `scripts/trace_callchain.py` —— 超纲判定自动化（符号 → 主入口，输出可达/不可达）
 - [ ] `scripts/check_doc_anchors.py` —— N4.5 自动化（抽 bash 块 + 反引号标识符 → 实跑/grep）
-- [ ] `scripts/pack_skillhub.sh` —— N6-S 打包（不看 .gitignore，实例数据先移出后移回）
-- [ ] 四个专家的配置文件（挑刺用户 ×2 身份 / 用户视角写手 / 发布执行者 / **第三方代码审计**）
-- [ ] `.publish-staging/` 暂存区约定 + `.gitignore` 排除
-- [ ] 与 `publish-quality.md` 的双维度打分对接（脚本管硬指标，人/挑刺专家管软指标）
+- [x] `scripts/pack_skillhub.sh` —— N6-S 打包（自检 11/11）
+  - 为什么必须有：skillhub 打包**不看 `.gitignore`**，排除表写死只有 `.git`/`.idea`/`.vscode`/`node_modules`/`__pycache__`
+    ＋ `*.pyc`/`.DS_Store`/`Thumbs.db`（`skills_store_cli.py:2227`）→ `.publish-staging/`、脚本自测临时目录会被当正式文件传上去
+  - 产出干净副本 → `skillhub publish "<副本路径>"`。**发布的是副本，不是源目录**
+  - 同时剔除平台拒收的 `LICENSE`（400「不允许的文件类型」）与 `.gitignore`；许可靠 frontmatter `license:` 声明
+- [x] ~~四个专家的配置文件（挑刺用户 ×2 身份 / 用户视角写手 / **第三方代码审计**）~~ —— **2026-09-23 定：不建**（见名册 §7.20.1）
+  - 理由：与 §7.2「团队不独立成实体」冲突；配置文件会成为**第二处角色定义**，
+    而"改一处忘一处"正是本轮反复在修的病灶。角色定义只留 `publish-team-roster.md` 一处，
+    子 agent 启动时读名册。**从待实现清单撤掉，不是延后。**
+- [x] `.publish-staging/` 暂存区约定 + `.gitignore` 排除
+  - **2026-09-23 补**：`.gitignore` 只挡 git，**挡不住 skillhub 打包**；包内的暂存区由 `pack_skillhub.sh` 剔除
+- [x] 与 `publish-quality.md` 的双维度打分对接（脚本管硬指标，人/挑刺专家管软指标）—— **2026-09-23 定：接线，不新建机制**（见名册 §7.20.4）
+  - 硬指标已有现成件：`quality_metrics.py`（客观代理指标）+ `render_check.py`（同族病灶机器拦截）
+  - 缺的只是"把这两个的输出接到打分表上"——那是接线，不是设计
